@@ -101,35 +101,35 @@
     </p>
 
     <div class="cards" id="cards">
-      <a class="card" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">
+      <a class="card" id="card-mac-arm" data-suffix="_aarch64.dmg" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">
         <span class="os">macOS</span>
         <span class="arch">Apple Silicon (M1/M2/M3/M4)</span>
-        <span class="get">↓ Releases page</span>
+        <span class="get">↓ See releases page</span>
       </a>
-      <a class="card" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">
+      <a class="card" id="card-mac-intel" data-suffix="_x64.dmg" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">
         <span class="os">macOS</span>
         <span class="arch">Intel</span>
-        <span class="get">↓ Releases page</span>
+        <span class="get">↓ See releases page</span>
       </a>
-      <a class="card" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">
+      <a class="card" id="card-windows" data-suffix="_x64_en-US.msi" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">
         <span class="os">Windows</span>
         <span class="arch">64-bit installer (.msi)</span>
-        <span class="get">↓ Releases page</span>
+        <span class="get">↓ See releases page</span>
       </a>
-      <a class="card" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">
+      <a class="card" id="card-linux" data-suffix="_amd64.deb" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">
         <span class="os">Linux</span>
-        <span class="arch">.deb / .AppImage</span>
-        <span class="get">↓ Releases page</span>
+        <span class="arch">Ubuntu / Debian (.deb)</span>
+        <span class="get">↓ See releases page</span>
       </a>
     </div>
 
-    <div class="note">
-      All four buttons go to the same place — <strong>GitHub Releases</strong>, where
-      each platform's actual installer is listed as a download under the newest
-      version at the top. We're still pre-1.0, so releases are marked
-      "Pre-release" on GitHub — that's expected, not a warning sign. Builds are
-      versioned and free to inspect before you run them: that's the whole point
-      of shipping this way instead of hosting the binaries ourselves.
+    <p class="lede" style="font-size:14px;margin:-24px 0 24px;">
+      Not on Ubuntu/Debian? Fedora/RHEL and portable .AppImage builds are also
+      published — see the <a href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">full releases page</a>.
+    </p>
+
+    <div class="note" id="statusNote">
+      Looking up the latest build…
     </div>
 
     <div class="note warn">
@@ -141,13 +141,54 @@
       prompt. The source is public — see for yourself there's nothing hiding in it.
     </div>
 
-    <h2>Not seeing a release yet?</h2>
-    <p class="lede" style="margin-bottom:0;">
-      The build pipeline is new — if the releases page is empty, a build hasn't
-      been published yet. Check back soon, or read
-      <a class="foot-link" href="https://github.com/gremstard/blockwire/blob/main/claude.md" target="_blank" rel="noopener">CLAUDE.md</a>
-      for where things stand.
+    <p class="lede" style="font-size:13px;margin-bottom:0;">
+      Read <a class="foot-link" href="https://github.com/gremstard/blockwire/blob/main/claude.md" target="_blank" rel="noopener">CLAUDE.md</a>
+      for where the project stands, or grab the file yourself from the
+      <a class="foot-link" href="https://github.com/gremstard/blockwire/releases" target="_blank" rel="noopener">releases page</a>
+      if you'd rather not wait on the lookup above.
     </p>
   </div>
+
+<script>
+(function () {
+  var REPO = 'gremstard/blockwire';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#cards .card'));
+  var statusEl = document.getElementById('statusNote');
+
+  function fmtSize(bytes) {
+    var mb = bytes / (1000 * 1000);
+    return mb.toFixed(mb < 10 ? 1 : 0) + ' MB';
+  }
+
+  fetch('https://api.github.com/repos/' + REPO + '/releases')
+    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function (releases) {
+      // Newest release with real assets attached — skips any empty/draft
+      // entries and doesn't rely on GitHub's "latest" concept, which
+      // explicitly excludes prereleases (everything is a prerelease pre-1.0).
+      var rel = releases.find(function (r) { return Array.isArray(r.assets) && r.assets.length > 0; });
+      if (!rel) {
+        statusEl.textContent = 'No build has been published yet — check back soon, or browse the releases page directly.';
+        return;
+      }
+      var matched = 0;
+      cards.forEach(function (card) {
+        var suffix = card.dataset.suffix;
+        var asset = rel.assets.find(function (a) { return a.name.endsWith(suffix); });
+        if (asset) {
+          card.href = asset.browser_download_url;
+          card.querySelector('.get').textContent = '↓ ' + fmtSize(asset.size);
+          matched++;
+        }
+      });
+      statusEl.textContent = matched === cards.length
+        ? 'Showing ' + rel.tag_name + ' — click a card above to download that file directly.'
+        : 'Showing ' + rel.tag_name + ' — some platforms weren’t found in this release, so those cards still point at the full releases page.';
+    })
+    .catch(function () {
+      statusEl.textContent = 'Could not look up the latest build automatically — the cards above go to the full releases page instead.';
+    });
+})();
+</script>
 </body>
 </html>

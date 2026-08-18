@@ -65,6 +65,26 @@ jobs:
           releaseName: 'Blockwire desktop ${{ github.ref_name }}'
           releaseBody: |
             Desktop client (Tauri) — Windows, Linux, and macOS (Apple Silicon + Intel).
+            **Not sure which file below is yours? Use https://blockwire.web.app/download.html
+            instead — it links straight to the right one for your OS.**
+
+            ## Which file do I want?
+
+            | Your computer | File ending in |
+            |---|---|
+            | Mac — Apple Silicon (M1/M2/M3/M4) | `_aarch64.dmg` |
+            | Mac — Intel | `_x64.dmg` |
+            | Windows | `_x64_en-US.msi` |
+            | Linux — Ubuntu/Debian | `_amd64.deb` |
+            | Linux — other/portable | `_amd64.AppImage` |
+            | Linux — Fedora/RHEL | `.x86_64.rpm` |
+
+            Not sure if your Mac is Apple Silicon or Intel? Apple menu → **About This
+            Mac** — "Chip" means Apple Silicon, "Processor" means Intel.
+
+            Ignore the `.app.tar.gz` files and the `-setup.exe` — those are for the
+            auto-updater and an alternate Windows installer respectively, not what
+            you want for a first install. Pick exactly one file from the table above.
 
             Unsigned builds: macOS will say the app "cannot be verified" (right-click →
             Open, or System Settings → Privacy & Security → "Open Anyway"); Windows

@@ -949,6 +949,49 @@ orphaning that page). Deployed.
     the *next* tag pushed, doesn't need to re-prove the already-working build
     matrix).
 
+**Milestone: download UX fixed — real per-platform links, not a 9-file dump.**
+Riz pasted the actual GitHub release asset list and flagged the obvious
+problem: nine cryptically-named files (`.dmg` ×2, `.app.tar.gz` ×2, `.deb`,
+`.AppImage`, `.rpm`, `.msi`, `-setup.exe`) with zero explanation is unusable
+for anyone who isn't already a developer. Fixed both ends:
+- **The GitHub release description itself** (both in `release.yml`'s
+  `releaseBody` template for future tags, and retroactively applied to the
+  live `online-v0.8.33` release via `gh release edit --notes-file`) now has
+  an explicit "Which file do I want?" table mapping OS → filename suffix,
+  a Mac Apple-Silicon-vs-Intel identification tip (Apple menu → About This
+  Mac → "Chip" vs "Processor"), and a callout that `.app.tar.gz`/`-setup.exe`
+  are for the updater/an alternate installer, not what a first-time user
+  wants — plus a pointer back to `download.html` for anyone who'd rather not
+  parse a file table at all.
+- **`download.html` now deep-links to the exact right file per platform**,
+  not a static `/releases` fallback link on every card. It fetches
+  `api.github.com/repos/gremstard/blockwire/releases` client-side (a public,
+  unauthenticated, CORS-open GET — no token needed), finds the newest release
+  that actually has assets attached (skips empty/draft entries, and
+  deliberately doesn't rely on GitHub's "latest" concept for the same reason
+  `/releases/latest` broke earlier — prereleases don't count as latest), and
+  matches each of the 4 platform cards by filename suffix (`_aarch64.dmg`,
+  `_x64.dmg`, `_x64_en-US.msi`, `_amd64.deb` — Fedora/RHEL `.rpm` and
+  `.AppImage` are called out in a line of text below the cards instead of
+  getting their own card, to keep the grid to the four most common targets).
+  On a match, the card's href is rewritten to the exact
+  `releases/download/.../Blockwire_X.Y.Z_....dmg`-style asset URL and its
+  label swaps from "See releases page" to the real file size (fetched from
+  the API response, not guessed). A status line below the cards confirms
+  which version is showing. **Every card's default `href` before the fetch
+  resolves is still the plain `/releases` list** — so if the API call fails,
+  is rate-limited, or JS doesn't run at all, every card still works as a
+  plain link, it just doesn't skip the extra click. No filenames are
+  hardcoded anywhere in the page, so this needs zero manual editing on future
+  releases as long as the same suffix convention holds.
+- Verified directly in the browser preview against the real live repo (not a
+  mock): all 4 cards resolved to their exact correct asset URLs with real
+  file sizes (4.0–4.2 MB each), and the status line correctly read "Showing
+  online-v0.8.33 — click a card above to download that file directly."
+  Confirmed the fallback path is structurally sound (default hrefs are
+  literally the old `/releases` URLs, untouched unless overwritten) without
+  needing to fake a network failure to prove it. Deployed.
+
 ---
 
 ## 8. Handoff checklist for Claude Code
