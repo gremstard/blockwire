@@ -1,0 +1,77 @@
+name: Release blockwire-online
+
+# Triggered by pushing a tag like "online-v0.8.33" (the blockwire-online desktop
+# app has its own version line, separate from the public browser build — see
+# CLAUDE.md's versioning section — so its release tags are prefixed to tell
+# them apart from any future public-build tag). workflow_dispatch is there so
+# a build can be re-run by hand without cutting a new tag.
+on:
+  push:
+    tags:
+      - 'online-v*'
+  workflow_dispatch:
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest' # Apple Silicon
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-latest' # Intel
+            args: '--target x86_64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: blockwire-online/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Only used on macOS runners — harmless no-op elsewhere.
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        working-directory: blockwire-online
+        run: npm ci
+
+      - name: Build and publish
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: blockwire-online
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Blockwire desktop ${{ github.ref_name }}'
+          releaseBody: |
+            Desktop client (Tauri) — Windows, Linux, and macOS (Apple Silicon + Intel).
+
+            Unsigned builds: macOS will say the app "cannot be verified" (right-click →
+            Open, or System Settings → Privacy & Security → "Open Anyway"); Windows
+            SmartScreen may warn on first launch (More info → Run anyway). Not
+            malicious — we just don't have a code-signing certificate yet.
+
+            See CLAUDE.md in the repo for what changed.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

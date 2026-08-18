@@ -14,7 +14,12 @@ had a quick contrast fix (Milestone 3.2) — **Stage 1 is now feature-complete**
 Riz's visual QA and the real cross-machine LAN test on the desktop-specific pieces.
 The **Camera Block** (Milestone 5, `blockwire-online`-only) is also now built, with a
 same-session correction to how it's obtained (Milestone 5.1: a `/camera` chat command,
-not a Workbench recipe) — see below — while that QA is pending.
+not a Workbench recipe) — see below — while that QA is pending. **Stage 2** work has
+started alongside Riz's QA: several real bugs found and fixed (§6, Milestones 5.2–5.4),
+plus the public GitHub repo, LICENSE, and a GitHub Actions cross-platform build +
+`download.html` pipeline for `blockwire-online` are now live — see the Stage 1 plan
+section for details; the pipeline itself hasn't been proven end-to-end yet (no tag
+pushed).
 **Studio:** Brain Dump Inneractive (Riz / mrrzone) · **License:** AGPLv3, source-available.
 **Philosophy:** *"The player, not the payout."*
 
@@ -866,9 +871,52 @@ project identifier by Firebase's own design, not a secret; access control is via
 Firestore rules, already reviewed). `public/index.html`'s "View the source" link
 now points at the real repo (was a `source.html`-viewer placeholder — kept
 `source.html` reachable via a small secondary link alongside it rather than
-orphaning that page). Deployed. **Not built yet:** the GitHub Actions
-cross-platform build workflow and `download.html` — the repo itself was today's
-scope; ask before starting the Actions/Releases pipeline.
+orphaning that page). Deployed.
+
+**GitHub Actions cross-platform build pipeline + `download.html` — built:**
+- `.github/workflows/release.yml`: triggers on pushing a tag matching
+  `online-v*` (prefixed to distinguish it from any future public-build tag —
+  `blockwire-online` and `public/blockwire.html` version independently, see §2)
+  or manual `workflow_dispatch`. Matrix of 4 jobs — macOS Apple Silicon
+  (`aarch64-apple-darwin`), macOS Intel (`x86_64-apple-darwin`), Ubuntu 22.04,
+  Windows — each running `tauri-apps/tauri-action@v1` with
+  `projectPath: blockwire-online` (the Tauri project isn't at repo root, so this
+  is required — confirmed via the action's own README, fetched fresh rather than
+  trusted from memory since action versions/syntax drift: the official example
+  now pins `@v1`, not the older `@v0` tag). All 4 jobs target the same
+  `releaseDraft: true` release for the pushed tag — this is the standard
+  multi-platform pattern (each job uploads its own platform's artifacts to the
+  one release; the draft means Riz reviews and publishes by hand, not an
+  auto-publish of unverified builds). Linux runners install
+  `libwebkit2gtk-4.1-dev`/`libappindicator3-dev`/`librsvg2-dev`/`patchelf`
+  first (Tauri's standard Ubuntu build deps). Validated with `actionlint`
+  (installed via `brew`) — clean; **not yet exercised end-to-end** (no tag has
+  been pushed, so no real build has run in CI yet — that's the one thing only
+  actually cutting a release tag will prove out).
+- `blockwire-online/src-tauri/Cargo.toml`'s `repository` field (previously
+  empty) now points at the real repo; `cargo check` re-confirmed clean after
+  the edit (metadata-only change, but checked anyway).
+- `public/download.html` (new page, same visual system as the rest of the
+  site — lifted the topbar/wrap shell from `source.html`): four platform cards
+  (macOS Apple Silicon, macOS Intel, Windows, Linux), all linking to
+  `github.com/gremstard/blockwire/releases/latest` rather than guessing exact
+  per-asset filenames (fragile — GitHub's release page already lists each
+  platform's real download clearly; deep-linking exact filenames would break
+  silently if the build config or `tauri-action`'s naming pattern ever
+  changes). Explicit note that builds are unsigned (macOS Gatekeeper / Windows
+  SmartScreen will warn — expected, not a bug, no code-signing cert exists
+  yet) and an honest note that `releases/latest` will come up empty until a
+  tag is actually pushed and a build finishes. Linked from `index.html`'s nav
+  (new "Download" entry, between Source and Sign in). Verified in the browser
+  preview: page renders per the site's visual language, all 4 cards + the
+  CLAUDE.md link resolve to the correct URLs. Deployed alongside the nav
+  update.
+- **What's left before this is a real, trustworthy pipeline, not just
+  wired-up:** push an actual `online-v0.8.33`-style tag and confirm all 4
+  platform builds succeed and the draft release looks right (I could validate
+  the workflow's syntax and logic but can't run GitHub-hosted CI runners
+  myself); then Riz reviews and publishes the draft. Needs Riz's call on
+  when to cut the first real tag.
 
 ---
 

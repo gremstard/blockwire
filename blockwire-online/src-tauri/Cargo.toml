@@ -4,7 +4,7 @@ version = "0.8.33"
 description = "Blockwire desktop client"
 authors = ["Brain Dump Inneractive"]
 license = "AGPL-3.0"
-repository = ""
+repository = "https://github.com/gremstard/blockwire"
 edition = "2021"
 rust-version = "1.77.2"
 
