@@ -890,9 +890,7 @@ orphaning that page). Deployed.
   auto-publish of unverified builds). Linux runners install
   `libwebkit2gtk-4.1-dev`/`libappindicator3-dev`/`librsvg2-dev`/`patchelf`
   first (Tauri's standard Ubuntu build deps). Validated with `actionlint`
-  (installed via `brew`) — clean; **not yet exercised end-to-end** (no tag has
-  been pushed, so no real build has run in CI yet — that's the one thing only
-  actually cutting a release tag will prove out).
+  (installed via `brew`) — clean.
 - `blockwire-online/src-tauri/Cargo.toml`'s `repository` field (previously
   empty) now points at the real repo; `cargo check` re-confirmed clean after
   the edit (metadata-only change, but checked anyway).
@@ -911,12 +909,20 @@ orphaning that page). Deployed.
   preview: page renders per the site's visual language, all 4 cards + the
   CLAUDE.md link resolve to the correct URLs. Deployed alongside the nav
   update.
-- **What's left before this is a real, trustworthy pipeline, not just
-  wired-up:** push an actual `online-v0.8.33`-style tag and confirm all 4
-  platform builds succeed and the draft release looks right (I could validate
-  the workflow's syntax and logic but can't run GitHub-hosted CI runners
-  myself); then Riz reviews and publishes the draft. Needs Riz's call on
-  when to cut the first real tag.
+- **Exercised end-to-end and confirmed working:** pushed the `online-v0.8.33`
+  tag — all 4 matrix jobs succeeded (macOS Apple Silicon 5m21s, macOS Intel
+  4m0s, Ubuntu 11m13s, Windows 7m30s) and landed in one shared draft release
+  with every expected asset: `.dmg` + `.app.tar.gz` ×2 (arm64/x64 macOS),
+  `.deb`/`.AppImage`/`.rpm` (Linux), `.msi`/`-setup.exe` (Windows) — 9 files
+  total. Left as a **draft** on purpose (per the `releaseDraft: true` design
+  above) — it is NOT public yet. **Needs Riz to review the draft release on
+  GitHub and click Publish** before `download.html`'s links resolve to
+  anything (they point at `releases/latest`, which only exists once a
+  non-draft release does). One rough edge from that first run — GitHub
+  flagged `actions/checkout@v4`/`actions/setup-node@v4` as targeting a
+  deprecated Node 20 runtime (harmless, auto-forced to Node 24) — bumped both
+  to `@v5` right after; re-validated with `actionlint`, not yet re-run in CI
+  since bumping action versions doesn't need re-proving the whole matrix.
 
 ---
 
