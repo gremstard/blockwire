@@ -850,9 +850,25 @@ tutorial is 1.0 polish; combat is post-1.0 community-mod territory; vehicles are
   rather than hosting the binaries ourselves — free, versioned, no bandwidth ceiling
   to worry about (this is what made Firebase Hosting or Internet Archive feel like a
   stretch earlier). `download.html` (still not built) would just link to
-  `github.com/<org>/<repo>/releases/latest`. Prerequisite: an actual public GitHub
-  repo for the project doesn't exist yet — `public/index.html`'s "View the source"
-  link is still a `<!-- TODO: point this at the real repository -->` placeholder.
+  `github.com/gremstard/blockwire/releases/latest`.
+
+**GitHub repo — live (Stage 2):** `github.com/gremstard/blockwire`, public, AGPLv3
+`LICENSE` added (fetched verbatim from GitHub's license API, matching the license
+already stated here and in the in-game ToS). Initial commit is the full working
+tree (`public/` + `blockwire-online/`) minus `node_modules/`/`target/`/build
+artifacts — the pre-existing root `.gitignore` already covered `node_modules/`;
+added `.DS_Store` and `target/` (the Rust build directory was the only thing that
+would've made this a multi-GB repo — `blockwire-online/src-tauri/.gitignore`
+already covered it locally, but the root ignore didn't, so added it there too for
+safety). Checked the whole staged tree for secrets before the first commit — clean
+(the Firebase client config embedded in `account.html`/`index.html` is a public
+project identifier by Firebase's own design, not a secret; access control is via
+Firestore rules, already reviewed). `public/index.html`'s "View the source" link
+now points at the real repo (was a `source.html`-viewer placeholder — kept
+`source.html` reachable via a small secondary link alongside it rather than
+orphaning that page). Deployed. **Not built yet:** the GitHub Actions
+cross-platform build workflow and `download.html` — the repo itself was today's
+scope; ask before starting the Actions/Releases pipeline.
 
 ---
 
