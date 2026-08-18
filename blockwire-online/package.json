@@ -1,0 +1,18 @@
+{
+  "name": "blockwire-online",
+  "version": "1.0.0",
+  "description": "Blockwire desktop client (Tauri) — forked from the public browser build",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "license": "AGPL-3.0",
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-fs": "^2.5.1"
+  }
+}

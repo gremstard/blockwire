@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blockwire — Source</title>
+<meta name="description" content="Read the full source of Blockwire in your browser." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='0' y='0' width='16' height='16' fill='%23FF0000'/><rect x='16' y='0' width='16' height='16' fill='%2300FF00'/><rect x='0' y='16' width='16' height='16' fill='%230080FF'/><rect x='16' y='16' width='16' height='16' fill='%23FFFF00'/><g fill='%230F1216' font-family='sans-serif' font-weight='900' font-size='44'><text x='-1.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>B</text><text x='14.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>W</text></g></svg>" />
+<style>
+  :root {
+    --void:#0F1216; --panel:#1B212B; --line:#2E3846; --chalk:#E6EAF0; --dim:#8792A3;
+    --p-red:#FF0000; --p-grn:#00FF00; --p-blu:#0080FF; --p-yel:#FFFF00; --p-mag:#FF00FF;
+    --display:'Archivo Black',system-ui,sans-serif; --body:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--void); color:var(--chalk); font-family:var(--body); }
+  a { color:inherit; }
+  :focus-visible { outline:2px solid var(--p-blu); outline-offset:3px; }
+
+  .topbar {
+    position:sticky; top:0; z-index:5; background:rgba(15,18,22,0.92); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px; gap:16px; flex-wrap:wrap;
+  }
+  .brand { display:flex; align-items:center; gap:11px; text-decoration:none; }
+  .brand .logo { width:26px; height:26px; }
+  .brand .name { font-family:var(--display); font-size:18px; letter-spacing:-0.02em; }
+  .brand .name small { color:var(--dim); font-family:var(--mono); font-size:12px; letter-spacing:0; }
+  .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .btn {
+    font-family:var(--body); font-size:13px; font-weight:500; text-decoration:none;
+    background:#232a35; color:var(--chalk); border:1px solid var(--line);
+    padding:8px 14px; cursor:pointer; border-radius:2px; display:inline-flex; align-items:center; gap:7px;
+  }
+  .btn:hover { background:#2b3340; border-color:#3d4757; }
+  .btn.go { background:var(--chalk); color:var(--void); border-color:var(--chalk); font-weight:600; }
+  .btn.go:hover { background:#fff; }
+  .meta { font-family:var(--mono); font-size:12px; color:var(--dim); }
+
+  .wrap { max-width:1100px; margin:0 auto; padding:26px 20px 80px; }
+  .lede { color:var(--dim); font-size:15px; margin:0 0 22px; max-width:70ch; }
+  .lede strong { color:var(--chalk); font-weight:500; }
+
+  .codeframe { border:1px solid var(--line); background:#0c0f13; }
+  .codehead {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:9px 14px; border-bottom:1px solid var(--line); font-family:var(--mono); font-size:12px; color:var(--dim);
+  }
+  .codehead .dots { display:flex; gap:6px; }
+  .codehead .dots i { width:11px; height:11px; border-radius:50%; display:block; }
+  pre {
+    margin:0; padding:20px; overflow:auto; max-height:none;
+    font-family:var(--mono); font-size:12.5px; line-height:1.65; tab-size:2;
+    counter-reset:ln;
+  }
+  code { white-space:pre; }
+  /* line numbers */
+  .line { display:block; }
+  .line::before {
+    counter-increment:ln; content:counter(ln);
+    display:inline-block; width:3.4em; margin-right:1.4em; text-align:right;
+    color:#3c4756; user-select:none;
+  }
+  /* token colors — palette-driven, so the code reads like the game looks */
+  .t-com { color:#5a6675; font-style:italic; }
+  .t-str { color:#8ee89a; }         /* green — strings */
+  .t-key { color:#5aa0ff; }         /* blue — keywords */
+  .t-num { color:#ffd24a; }         /* yellow — numbers */
+  .t-fn  { color:#e88ad0; }         /* magenta-ish — function names */
+  .t-tag { color:#ff8a7a; }         /* html tags */
+
+  .loading { color:var(--dim); font-family:var(--mono); font-size:13px; padding:40px; text-align:center; }
+  .err { color:#ef9a9a; }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;} }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="brand" href="index.html">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="0" y="0" width="16" height="16" fill="#FF0000"/><rect x="16" y="0" width="16" height="16" fill="#00FF00"/>
+        <rect x="0" y="16" width="16" height="16" fill="#0080FF"/><rect x="16" y="16" width="16" height="16" fill="#FFFF00"/>
+        <g fill="#0F1216" font-family="'Archivo Black',sans-serif" font-size="44">
+          <text x="-1.5" y="31" textLength="19" lengthAdjust="spacingAndGlyphs">B</text>
+          <text x="14.5" y="31" textLength="19" lengthAdjust="spacingAndGlyphs">W</text>
+        </g>
+      </svg>
+      <span class="name">BLOCKWIRE <small>/ source</small></span>
+    </a>
+    <div class="actions">
+      <span class="meta" id="meta"></span>
+      <button class="btn" id="copyBtn">Copy all</button>
+      <a class="btn" id="rawBtn" href="blockwire.html" download="blockwire.html">Download</a>
+      <a class="btn go" href="blockwire.html">Play →</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <p class="lede">
+      This is the <strong>entire game</strong> — Blockwire is a single self-contained HTML file.
+      What runs at <strong>blockwire.web.app</strong> is exactly what's below: no build step, no
+      hidden bundle. Read it, copy it, learn from it.
+    </p>
+
+    <div class="codeframe">
+      <div class="codehead">
+        <div class="dots"><i style="background:#FF0000"></i><i style="background:#FFFF00"></i><i style="background:#00FF00"></i></div>
+        <span id="filename">blockwire.html</span>
+      </div>
+      <pre id="code"><span class="loading" id="loading">Loading source…</span></pre>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  var SRC = 'blockwire.html';
+  var codeEl = document.getElementById('code');
+  var loadingEl = document.getElementById('loading');
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Lightweight highlighter. Works on already-escaped text. Order matters:
+  // comments and strings first (as whole spans), then keywords/numbers on the
+  // remaining plain runs so we never recolor inside a string or comment.
+  var KEYWORDS = /\b(function|return|const|let|var|if|else|for|while|new|this|typeof|instanceof|of|in|null|true|false|undefined|break|continue|switch|case|default|try|catch|finally|throw|do|void|delete|class|extends|super|async|await)\b/g;
+
+  function highlightPlain(s) {
+    // s is escaped, no strings/comments inside
+    s = s.replace(KEYWORDS, '\u0001K$1\u0002');
+    s = s.replace(/\b(0x[0-9a-fA-F]+|\d+\.?\d*)\b/g, '\u0001N$1\u0002');
+    // function-name after 'function ' or before '('
+    s = s.replace(/\u0001K(function)\u0002(\s+)([A-Za-z_$][\w$]*)/g, '\u0001K$1\u0002$2\u0001F$3\u0002');
+    // convert markers to spans
+    s = s.replace(/\u0001K([^\u0002]*)\u0002/g, '<span class="t-key">$1</span>')
+         .replace(/\u0001N([^\u0002]*)\u0002/g, '<span class="t-num">$1</span>')
+         .replace(/\u0001F([^\u0002]*)\u0002/g, '<span class="t-fn">$1</span>');
+    return s;
+  }
+
+  // Split a line into comment / string / code segments, highlight each.
+  function highlightLine(raw) {
+    var esc = escapeHtml(raw);
+    // whole-line comment
+    var out = '';
+    var i = 0, n = esc.length;
+    var buf = '';
+    function flush() { if (buf) { out += highlightPlain(buf); buf = ''; } }
+    while (i < n) {
+      var two = esc.substr(i, 2);
+      // line comment (rest of line)
+      if (two === '//') { flush(); out += '<span class="t-com">' + esc.slice(i) + '</span>'; i = n; break; }
+      var ch = esc[i];
+      // strings
+      if (ch === '"' || ch === "'" || ch === '`') {
+        flush();
+        var q = ch, j = i + 1, s = ch;
+        while (j < n) {
+          s += esc[j];
+          if (esc[j] === '\\') { s += esc[j + 1] || ''; j += 2; continue; }
+          if (esc[j] === q) { j++; break; }
+          j++;
+        }
+        out += '<span class="t-str">' + s + '</span>';
+        i = j; continue;
+      }
+      buf += ch; i++;
+    }
+    flush();
+    return out;
+  }
+
+  function render(text) {
+    var lines = text.split('\n');
+    // Build with a document fragment string; line-number via CSS counter.
+    var html = '';
+    for (var k = 0; k < lines.length; k++) {
+      html += '<span class="line">' + highlightLine(lines[k]) + '\n</span>';
+    }
+    codeEl.innerHTML = '<code>' + html + '</code>';
+    document.getElementById('meta').textContent =
+      lines.length.toLocaleString() + ' lines · ' + (text.length / 1024).toFixed(0) + ' KB';
+    window.__blockwireSource = text;
+  }
+
+  fetch(SRC).then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text();
+  }).then(render).catch(function (e) {
+    loadingEl.className = 'loading err';
+    loadingEl.textContent = 'Could not load ' + SRC + ' (' + e.message + '). ' +
+      'This viewer must be served next to blockwire.html — open it from blockwire.web.app, not from a file:// path.';
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    var t = window.__blockwireSource;
+    if (!t) return;
+    navigator.clipboard.writeText(t).then(function () {
+      var b = document.getElementById('copyBtn'), old = b.textContent;
+      b.textContent = 'Copied ✓';
+      setTimeout(function () { b.textContent = old; }, 1400);
+    });
+  });
+})();
+</script>
+</body>
+</html>

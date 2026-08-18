@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blockwire — Paint every block</title>
+<meta name="description" content="An open-source voxel world where nothing is pre-made. Paint your own blocks, sculpt them voxel by voxel, keep the recipe private, and sell copies to other players." />
+<link rel="canonical" href="https://blockwire.web.app/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Blockwire" />
+<meta property="og:title" content="Blockwire — Paint every block" />
+<meta property="og:description" content="An open-source voxel sandbox where nothing is pre-made. Paint and sculpt every block, save creations as private recipes, and trade copies with other players." />
+<meta property="og:url" content="https://blockwire.web.app/" />
+<meta property="og:image" content="https://blockwire.web.app/og-image.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Blockwire — Paint every block" />
+<meta name="twitter:description" content="Paint and sculpt every block, save creations as private recipes, and trade copies with other players. Open-source voxel sandbox, in playtest." />
+<meta name="twitter:image" content="https://blockwire.web.app/og-image.png" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='0' y='0' width='16' height='16' fill='%23FF0000'/><rect x='16' y='0' width='16' height='16' fill='%2300FF00'/><rect x='0' y='16' width='16' height='16' fill='%230080FF'/><rect x='16' y='16' width='16' height='16' fill='%23FFFF00'/><g fill='%230F1216' font-family='sans-serif' font-weight='900' font-size='44'><text x='-1.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>B</text><text x='14.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>W</text></g></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Palette is taken from the game's own colour model: every channel is
+     0, 128 or 255, which is exactly the 27-colour base palette players start
+     with. The site uses those colours as a SET, because the whole point of
+     Blockwire is the palette, not one accent. */
+  :root {
+    --void:  #0F1216;
+    --panel: #1B212B;
+    --line:  #2E3846;
+    --chalk: #E6EAF0;
+    --dim:   #8792A3;
+
+    --p-red:  #FF0000;
+    --p-grn:  #00FF00;
+    --p-blu:  #0080FF;
+    --p-yel:  #FFFF00;
+    --p-mag:  #FF00FF;
+
+    --display: 'Archivo Black', system-ui, sans-serif;
+    --body: 'IBM Plex Sans', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--void); color: var(--chalk);
+    font-family: var(--body); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--p-blu); outline-offset: 3px; }
+
+  .wrap { width: min(1140px, 92vw); margin: 0 auto; }
+
+  /* ---- nav ---- */
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0; border-bottom: 1px solid var(--line);
+  }
+  .mark {
+    font-family: var(--display); font-size: 19px; letter-spacing: -0.02em;
+    text-decoration: none; display: flex; align-items: center; gap: 11px;
+  }
+  /* The mark: four palette colours with BW stretched across and cropped to the
+     tile. The letters run past the edges on purpose — the crop is the point. */
+  .logo { width: 26px; height: 26px; display: block; flex-shrink: 0; }
+  .navlinks { display: flex; gap: 26px; font-family: var(--mono); font-size: 13px; }
+  .navlinks a { color: var(--dim); text-decoration: none; }
+  .navlinks a:hover { color: var(--chalk); }
+  @media (max-width: 720px) { .navlinks { display: none; } }
+
+  /* ---- hero ---- */
+  .hero {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 64px;
+    align-items: center; padding: 84px 0 96px;
+  }
+  h1 {
+    font-family: var(--display); font-size: clamp(46px, 6.4vw, 82px);
+    line-height: 0.95; letter-spacing: -0.03em; margin: 0 0 24px;
+  }
+  h1 em { font-style: normal; color: var(--p-yel); }
+  .lede { font-size: 18px; color: var(--dim); margin: 0 0 32px; max-width: 46ch; }
+  .lede strong { color: var(--chalk); font-weight: 500; }
+
+  .cta-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .play {
+    font-family: var(--body); font-weight: 600; font-size: 16px;
+    background: var(--chalk); color: var(--void); border: 0;
+    padding: 15px 30px; border-radius: 2px; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 10px;
+    transition: transform .12s ease, background .12s ease;
+  }
+  .play:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--p-blu); }
+  .play-note { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+
+  /* ---- the signature: paint a real block, watch it become a block ---- */
+  .studio {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 18px; display: grid; gap: 14px;
+  }
+  .studio-top { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .studio-label {
+    font-family: var(--mono); font-size: 11px; color: var(--dim);
+    display: flex; justify-content: space-between; margin-bottom: 7px;
+  }
+  #paint, #cube { width: 100%; display: block; background: var(--void); border: 1px solid var(--line); }
+  #paint { cursor: crosshair; image-rendering: pixelated; aspect-ratio: 1; touch-action: none; }
+  #cube { aspect-ratio: 1; }
+
+  .swatches { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; }
+  .swatches button {
+    aspect-ratio: 1; border: 1px solid rgba(255,255,255,.14); padding: 0; cursor: pointer;
+    border-radius: 0;
+  }
+  .swatches button[aria-pressed="true"] { outline: 2px solid var(--chalk); outline-offset: 1px; z-index: 1; }
+  .studio-foot { display: flex; justify-content: space-between; align-items: center; }
+  .clear {
+    font-family: var(--mono); font-size: 11px; background: none; color: var(--dim);
+    border: 1px solid var(--line); padding: 5px 10px; cursor: pointer;
+  }
+  .clear:hover { color: var(--chalk); border-color: var(--dim); }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 44px; padding: 56px 0 72px; }
+  }
+
+  /* ---- sections ---- */
+  section { padding: 84px 0; border-top: 1px solid var(--line); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; color: var(--dim);
+    letter-spacing: .08em; text-transform: uppercase; margin-bottom: 18px;
+  }
+  h2 {
+    font-family: var(--display); font-size: clamp(28px, 3.6vw, 42px);
+    letter-spacing: -0.025em; line-height: 1.05; margin: 0 0 18px;
+  }
+  .sec-lede { color: var(--dim); max-width: 60ch; margin: 0 0 46px; font-size: 17px; }
+
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .col { background: var(--void); padding: 30px 26px; }
+  .col h3 { font-family: var(--body); font-weight: 600; font-size: 17px; margin: 0 0 10px; }
+  .col p { color: var(--dim); margin: 0; font-size: 15px; }
+  /* the rule under each heading is the one colour that column owns */
+  .col .bar { height: 3px; width: 34px; margin-bottom: 18px; }
+  @media (max-width: 820px) { .cols { grid-template-columns: 1fr; } }
+
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+  .duo > div { background: var(--void); padding: 32px 28px; }
+  .duo h3 { font-family: var(--display); font-size: 20px; margin: 0 0 12px; letter-spacing: -0.02em; }
+  .duo p { color: var(--dim); margin: 0 0 16px; font-size: 15px; }
+  .duo ul { margin: 0; padding-left: 18px; color: var(--dim); font-size: 14px; }
+  .duo li { margin-bottom: 6px; }
+  @media (max-width: 820px) { .duo { grid-template-columns: 1fr; } }
+
+  /* ---- roadmap: mono, because it's a status table, not decoration ---- */
+  .road { font-family: var(--mono); font-size: 14px; }
+  .road-row {
+    display: grid; grid-template-columns: 64px 1fr 96px; gap: 18px;
+    padding: 15px 0; border-bottom: 1px solid var(--line); align-items: baseline;
+  }
+  .road-row:first-child { border-top: 1px solid var(--line); }
+  .road-v { color: var(--chalk); }
+  .road-what { color: var(--dim); }
+  .road-s { text-align: right; font-size: 12px; }
+  .s-done { color: var(--p-grn); }
+  .s-now  { color: var(--p-yel); }
+  .s-soon { color: var(--dim); }
+  @media (max-width: 620px) {
+    .road-row { grid-template-columns: 52px 1fr; }
+    .road-s { grid-column: 2; text-align: left; }
+  }
+
+  footer {
+    border-top: 1px solid var(--line); padding: 40px 0 60px;
+    font-family: var(--mono); font-size: 12px; color: var(--dim);
+    display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  }
+  footer a { color: var(--dim); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="nav">
+    <a class="mark" href="#top">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <defs><clipPath id="bwCrop"><rect x="0" y="0" width="32" height="32"/></clipPath></defs>
+        <g clip-path="url(#bwCrop)">
+          <rect x="0"  y="0"  width="16" height="16" fill="#FF0000"/>
+          <rect x="16" y="0"  width="16" height="16" fill="#00FF00"/>
+          <rect x="0"  y="16" width="16" height="16" fill="#0080FF"/>
+          <rect x="16" y="16" width="16" height="16" fill="#FFFF00"/>
+          <g fill="#0F1216" font-family="'Archivo Black',system-ui,sans-serif" font-size="44">
+            <text x="-1.5" y="31" textLength="19" lengthAdjust="spacingAndGlyphs">B</text>
+            <text x="14.5" y="31" textLength="19" lengthAdjust="spacingAndGlyphs">W</text>
+          </g>
+        </g>
+      </svg>
+      BLOCKWIRE
+    </a>
+    <div class="navlinks">
+      <a href="#make">Make</a>
+      <a href="#own">Own</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#source">Source</a>
+      <a href="account.html">Sign in</a>
+    </div>
+  </nav>
+</div>
+
+<div class="wrap" id="top">
+  <header class="hero">
+    <div>
+      <h1>Paint<br/>every<br/><em>block.</em></h1>
+      <p class="lede">
+        Blockwire is an open-source voxel world where <strong>nothing is pre-made</strong>.
+        Paint a block face by face, or sculpt it voxel by voxel. Save it as a recipe only
+        you can open. Then produce copies and sell them to other players.
+      </p>
+      <div class="cta-row">
+        <a class="play" href="blockwire.html">Play in your browser →</a>
+        <span class="play-note">No install. No account.</span>
+      </div>
+    </div>
+
+    <!-- Signature: this is the actual game mechanic, running on the page.
+         Paint the grid; the cube is your block. -->
+    <div class="studio">
+      <div class="studio-top">
+        <div>
+          <div class="studio-label"><span>PAINTER</span><span>16 × 16</span></div>
+          <canvas id="paint" width="256" height="256" aria-label="Paintable 16 by 16 block face"></canvas>
+        </div>
+        <div>
+          <div class="studio-label"><span>YOUR BLOCK</span><span>LIVE</span></div>
+          <canvas id="cube" width="256" height="256" aria-hidden="true"></canvas>
+        </div>
+      </div>
+      <div>
+        <div class="studio-label"><span>BASE PALETTE</span><span>27 COLOURS</span></div>
+        <div class="swatches" id="swatches"></div>
+      </div>
+      <div class="studio-foot">
+        <span class="play-note">Click and drag to paint. This is the real thing.</span>
+        <button class="clear" id="clear">Clear</button>
+      </div>
+    </div>
+  </header>
+</div>
+
+<div class="wrap">
+  <section id="make">
+    <div class="eyebrow">Two editors</div>
+    <h2>Flat or solid. Your call.</h2>
+    <p class="sec-lede">
+      Every block starts empty. Paint its six faces like pixel art, or go inside and
+      carve it out of voxels. Both save to the same kind of recipe.
+    </p>
+    <div class="duo">
+      <div>
+        <h3>The painter</h3>
+        <p>A 16×16 grid per face, six faces per tile. Straightforward pixel art with the tools you'd expect.</p>
+        <ul>
+          <li>Paint, fill, eyedropper, brush sizes</li>
+          <li>Per-pixel opacity — erase for windows, dial it down for tinted glass</li>
+          <li>Blocks up to 4×4 tiles, placed as a whole wall</li>
+          <li>Doors that open, painted front and back</li>
+        </ul>
+      </div>
+      <div>
+        <h3>The voxel editor</h3>
+        <p>Each cell is 16×16×16 voxels. Rotate the block and sculpt it directly in 3D.</p>
+        <ul>
+          <li>Add, delete, or paint one voxel — or just one side of it</li>
+          <li>Start from a solid cube and carve, or from nothing and build</li>
+          <li>Rectangle fill for big shapes</li>
+          <li>Up to 4×4×4 cells of room to work in</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="own">
+    <div class="eyebrow">Recipes and products</div>
+    <h2>What you make stays yours.</h2>
+    <p class="sec-lede">
+      Selling a block shouldn't mean giving away how you made it. Blockwire splits the
+      source from the copy, so you can trade freely without handing over your work.
+    </p>
+    <div class="cols">
+      <div class="col">
+        <div class="bar" style="background:var(--p-blu)"></div>
+        <h3>The recipe is private</h3>
+        <p>Your paint and voxel data, editable, owner-only. It never leaves your hands — nobody else can open it.</p>
+      </div>
+      <div class="col">
+        <div class="bar" style="background:var(--p-yel)"></div>
+        <h3>The product is public</h3>
+        <p>A frozen copy with no source attached. Place it, stack it, sell it. It can't be opened or reverse-engineered.</p>
+      </div>
+      <div class="col">
+        <div class="bar" style="background:var(--p-grn)"></div>
+        <h3>The market is the point</h3>
+        <p>Sell products for coins and build a reputation on your designs — not on who copied them fastest.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="eyebrow">Where it's going</div>
+    <h2>Built in the open.</h2>
+    <p class="sec-lede">
+      Blockwire is early and moving fast. Here's what's done, what's being worked on,
+      and what's coming.
+    </p>
+    <div class="road">
+      <div class="road-row"><span class="road-v">0.1</span><span class="road-what">The world — terrain, mining, building, inventory</span><span class="road-s s-done">DONE</span></div>
+      <div class="road-row"><span class="road-v">0.2</span><span class="road-what">The painter — recipes, glass, doors, the voxel editor</span><span class="road-s s-done">DONE</span></div>
+      <div class="road-row"><span class="road-v">0.3</span><span class="road-what">The market — coins, chests, industry &amp; power, saved worlds</span><span class="road-s s-done">DONE</span></div>
+      <div class="road-row"><span class="road-v">0.4–0.8</span><span class="road-what">The makers — lighting, machine art, the player (skins &amp; clothes)</span><span class="road-s s-done">DONE</span></div>
+      <div class="road-row"><span class="road-v">0.9</span><span class="road-what">Playing together — LAN, friends, invites, shared worlds</span><span class="road-s s-soon">PLANNED</span></div>
+      <div class="road-row"><span class="road-v">1.0</span><span class="road-what">The MMO — dedicated servers, accounts, the live market</span><span class="road-s s-soon">PLANNED</span></div>
+      <div class="road-row"><span class="road-v">1.1</span><span class="road-what">Vehicles — creative transport and utility</span><span class="road-s s-soon">PLANNED</span></div>
+    </div>
+  </section>
+
+  <section id="source">
+    <div class="eyebrow">Open source</div>
+    <h2>Take it apart.</h2>
+    <p class="sec-lede">
+      Blockwire is open source and moddable by design. Read it, fork it, break it,
+      or build something else out of it.
+    </p>
+    <div class="cta-row">
+      <!-- TODO: point this at the real repository -->
+      <a class="play" href="source.html" id="repoLink">View the source</a>
+      <span class="play-note">TypeScript &amp; three.js</span>
+    </div>
+  </section>
+</div>
+
+<div class="wrap">
+  <footer>
+    <span>Blockwire — an open-source voxel MMO.</span>
+    <span>Playtest 0.8.27</span>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ---- The game's real colour model: every channel is level 1/2/3, which maps
+  // to 0/128/255. Twenty-seven colours. Same maths the game uses. ----
+  const LEVELS = [0, 128, 255];
+  const PALETTE = [];
+  for (const r of LEVELS) for (const g of LEVELS) for (const b of LEVELS) PALETTE.push([r, g, b]);
+
+  const N = 16;                 // 16x16 face, same as the game
+  const CELL = 256 / N;
+  const paint = document.getElementById('paint');
+  const pctx = paint.getContext('2d');
+
+  // Start with something obviously hand-painted, so it reads as "you can change this".
+  const grid = new Array(N * N).fill('#0080FF');
+  (function seedStar() {
+    const star = [
+      '.......##.......',
+      '.......##.......',
+      '......####......',
+      '......####......',
+      '.############...',
+      '..##########....',
+      '...########.....',
+      '....######......',
+      '...########.....',
+      '..####..####....',
+      '..###....###....',
+      '.##........##...',
+      '................',
+      '................',
+      '................',
+      '................',
+    ];
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++)
+        if (star[y] && star[y][x] === '#') grid[y * N + x] = '#FFFF00';
+  })();
+
+  let current = '#FF0000';
+
+  function draw() {
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++) {
+        pctx.fillStyle = grid[y * N + x];
+        pctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+      }
+    // faint cell lines — the "wire" in Blockwire
+    pctx.strokeStyle = 'rgba(0,0,0,0.16)';
+    pctx.lineWidth = 1;
+    for (let i = 0; i <= N; i++) {
+      pctx.beginPath(); pctx.moveTo(i * CELL, 0); pctx.lineTo(i * CELL, 256); pctx.stroke();
+      pctx.beginPath(); pctx.moveTo(0, i * CELL); pctx.lineTo(256, i * CELL); pctx.stroke();
+    }
+    if (tex) tex.needsUpdate = true;
+  }
+
+  // ---- painting input (mouse + touch, with line interpolation like the game) ----
+  let painting = false, last = null;
+  function cellFromEvent(e) {
+    const r = paint.getBoundingClientRect();
+    const x = Math.floor(((e.clientX - r.left) / r.width) * N);
+    const y = Math.floor(((e.clientY - r.top) / r.height) * N);
+    if (x < 0 || x >= N || y < 0 || y >= N) return null;
+    return { x, y };
+  }
+  function put(c) { if (c) grid[c.y * N + c.x] = current; }
+  function stroke(e) {
+    const c = cellFromEvent(e);
+    if (!c) return;
+    if (last) { // interpolate so fast drags don't skip cells
+      const steps = Math.max(Math.abs(c.x - last.x), Math.abs(c.y - last.y));
+      for (let i = 1; i <= steps; i++)
+        put({ x: Math.round(last.x + (c.x - last.x) * i / steps), y: Math.round(last.y + (c.y - last.y) * i / steps) });
+    }
+    put(c); last = c; draw();
+  }
+  paint.addEventListener('pointerdown', (e) => {
+    painting = true; last = null; paint.setPointerCapture(e.pointerId); stroke(e);
+  });
+  paint.addEventListener('pointermove', (e) => { if (painting) stroke(e); });
+  window.addEventListener('pointerup', () => { painting = false; last = null; });
+
+  // ---- palette ----
+  const sw = document.getElementById('swatches');
+  PALETTE.forEach(([r, g, b]) => {
+    const hex = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+    const btn = document.createElement('button');
+    btn.style.background = hex;
+    btn.setAttribute('aria-label', 'Colour ' + hex);
+    btn.setAttribute('aria-pressed', hex === current ? 'true' : 'false');
+    btn.addEventListener('click', () => {
+      current = hex;
+      sw.querySelectorAll('button').forEach((b2) => b2.setAttribute('aria-pressed', 'false'));
+      btn.setAttribute('aria-pressed', 'true');
+    });
+    sw.appendChild(btn);
+  });
+
+  document.getElementById('clear').addEventListener('click', () => {
+    grid.fill('#808080'); draw();
+  });
+
+  // ---- the block: your painting, on an actual rotating cube ----
+  let tex = null;
+  const cubeCanvas = document.getElementById('cube');
+  if (window.THREE) {
+    const renderer = new THREE.WebGLRenderer({ canvas: cubeCanvas, antialias: true, alpha: true });
+    renderer.setSize(256, 256, false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+    cam.position.set(2.1, 1.6, 2.1); cam.lookAt(0, 0, 0);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.82));
+    const key = new THREE.DirectionalLight(0xffffff, 0.55); key.position.set(2, 3, 2); scene.add(key);
+
+    tex = new THREE.CanvasTexture(paint);
+    tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(1.35, 1.35, 1.35), new THREE.MeshLambertMaterial({ map: tex }));
+    scene.add(cube);
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(cube.geometry),
+      new THREE.LineBasicMaterial({ color: 0x2E3846 })
+    );
+    cube.add(edges);
+
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let t = 0;
+    (function loop() {
+      requestAnimationFrame(loop);
+      if (!reduce) { t += 0.006; cube.rotation.y = t; cube.rotation.x = Math.sin(t * 0.6) * 0.16; }
+      renderer.render(scene, cam);
+    })();
+  }
+
+  draw();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blockwire — Account</title>
+<meta name="description" content="Sign in or create a Blockwire account — the identity you'll link the desktop app to." />
+<link rel="canonical" href="https://blockwire.web.app/account.html" />
+<meta name="robots" content="noindex" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='0' y='0' width='16' height='16' fill='%23FF0000'/><rect x='16' y='0' width='16' height='16' fill='%2300FF00'/><rect x='0' y='16' width='16' height='16' fill='%230080FF'/><rect x='16' y='16' width='16' height='16' fill='%23FFFF00'/><g fill='%230F1216' font-family='sans-serif' font-weight='900' font-size='44'><text x='-1.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>B</text><text x='14.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>W</text></g></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Same palette/tokens as index.html — every channel 0/128/255, the game's own 27-colour set. */
+  :root {
+    --void:  #0F1216;
+    --panel: #1B212B;
+    --line:  #2E3846;
+    --chalk: #E6EAF0;
+    --dim:   #8792A3;
+    --p-red:  #FF0000;
+    --p-grn:  #00FF00;
+    --p-blu:  #0080FF;
+    --p-yel:  #FFFF00;
+    --p-mag:  #FF00FF;
+    --bad:    #FF5C5C;
+    --display: 'Archivo Black', system-ui, sans-serif;
+    --body: 'IBM Plex Sans', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--void); color: var(--chalk);
+    font-family: var(--body); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--p-blu); outline-offset: 3px; }
+  .wrap { width: min(1140px, 92vw); margin: 0 auto; }
+
+  .nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0; border-bottom: 1px solid var(--line);
+  }
+  .mark {
+    font-family: var(--display); font-size: 19px; letter-spacing: -0.02em;
+    text-decoration: none; display: flex; align-items: center; gap: 11px;
+  }
+  .logo { width: 26px; height: 26px; display: block; flex-shrink: 0; }
+
+  .authWrap {
+    min-height: calc(100vh - 71px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 48px 0;
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 32px; width: min(400px, 92vw);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .card h1 {
+    font-family: var(--display); font-size: 26px; letter-spacing: -0.02em;
+    margin: 0; line-height: 1.05;
+  }
+  .card .sub { color: var(--dim); font-size: 14px; margin: 0; }
+
+  .tabs { display: flex; gap: 2px; background: var(--line); border: 1px solid var(--line); }
+  .tabs button {
+    flex: 1; background: var(--void); color: var(--dim); border: 0;
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 10px; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--panel); color: var(--chalk); }
+
+  label { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: 0.04em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .field { display: flex; flex-direction: column; }
+  input[type=text], input[type=email], input[type=password] {
+    background: var(--void); border: 1px solid var(--line); color: var(--chalk);
+    font-family: var(--body); font-size: 15px; padding: 11px 12px; width: 100%;
+  }
+  input:focus-visible { outline: 2px solid var(--p-blu); outline-offset: 1px; }
+  .hint { font-size: 12px; color: var(--dim); margin-top: 5px; }
+
+  .btn {
+    font-family: var(--body); font-weight: 600; font-size: 15px;
+    background: var(--chalk); color: var(--void); border: 0;
+    padding: 13px 20px; cursor: pointer; text-align: center;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--p-blu); }
+  .btn:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+  .btn-google {
+    background: var(--void); color: var(--chalk); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .btn-google:hover { box-shadow: 3px 3px 0 var(--line); }
+  .btn-ghost {
+    background: none; color: var(--dim); border: 1px solid var(--line);
+  }
+  .btn-ghost:hover { color: var(--chalk); box-shadow: none; transform: none; }
+
+  .divider { display: flex; align-items: center; gap: 12px; color: var(--dim); font-size: 12px; font-family: var(--mono); }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+  .msg { font-size: 13px; padding: 10px 12px; border: 1px solid var(--line); display: none; }
+  .msg.show { display: block; }
+  .msg.err { border-color: var(--bad); color: var(--bad); }
+  .msg.ok { border-color: var(--p-grn); color: var(--chalk); }
+
+  .profileRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .profileRow .who { display: flex; flex-direction: column; gap: 2px; }
+  .profileRow .who .dn { font-family: var(--display); font-size: 18px; }
+  .profileRow .who .un { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+
+  .linkSection { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; }
+  .codeDisplay {
+    font-family: var(--mono); font-size: 28px; letter-spacing: 0.14em;
+    text-align: center; color: var(--p-yel); background: var(--void);
+    border: 1px solid var(--line); padding: 14px; margin-top: 12px;
+  }
+  .codeDisplay.linked { color: var(--p-grn); }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="nav">
+    <a class="mark" href="index.html">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <defs><clipPath id="bwCrop"><rect x="0" y="0" width="32" height="32"/></clipPath></defs>
+        <g clip-path="url(#bwCrop)">
+          <rect x="0"  y="0"  width="16" height="16" fill="#FF0000"/>
+          <rect x="16" y="0"  width="16" height="16" fill="#00FF00"/>
+          <rect x="0"  y="16" width="16" height="16" fill="#0080FF"/>
+          <rect x="16" y="16" width="16" height="16" fill="#FFFF00"/>
+          <g fill="#0F1216" font-family="'Archivo Black',system-ui,sans-serif" font-size="44">
+            <text x="-1.5" y="31" textLength="19" lengthAdjust="spacingAndGlyphs">B</text>
+            <text x="14.5" y="31" textLength="19" lengthAdjust="spacingAndGlyphs">W</text>
+          </g>
+        </g>
+      </svg>
+      BLOCKWIRE
+    </a>
+  </nav>
+</div>
+
+<div class="authWrap">
+
+  <!-- Signed out: sign in / sign up -->
+  <div class="card" id="authCard" hidden>
+    <div>
+      <h1>Your account</h1>
+      <p class="sub">Sign in on the web, then link the desktop app to it.</p>
+    </div>
+    <div class="tabs" role="tablist">
+      <button type="button" id="tabSignIn" role="tab" aria-selected="true">Sign in</button>
+      <button type="button" id="tabSignUp" role="tab" aria-selected="false">Sign up</button>
+    </div>
+
+    <div class="msg" id="authMsg"></div>
+
+    <button type="button" class="btn btn-google" id="googleBtn">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18z"/>
+        <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.03l3-2.33z"/>
+        <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.97l3 2.33C4.66 5.17 6.65 3.58 9 3.58z"/>
+      </svg>
+      Continue with Google
+    </button>
+    <div class="divider">or</div>
+
+    <form id="signInForm">
+      <div class="field" style="margin-bottom:12px;">
+        <label for="siEmail">Email</label>
+        <input type="email" id="siEmail" autocomplete="email" required />
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label for="siPassword">Password</label>
+        <input type="password" id="siPassword" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn" style="width:100%;">Sign in</button>
+    </form>
+
+    <form id="signUpForm" hidden>
+      <div class="field" style="margin-bottom:12px;">
+        <label for="suEmail">Email</label>
+        <input type="email" id="suEmail" autocomplete="email" required />
+        <div class="hint">Private — used for password resets, never shown to other players.</div>
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label for="suPassword">Password</label>
+        <input type="password" id="suPassword" autocomplete="new-password" required minlength="8" />
+        <div class="hint">At least 8 characters.</div>
+      </div>
+      <div class="field" style="margin-bottom:12px;">
+        <label for="suUsername">Username</label>
+        <input type="text" id="suUsername" required minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+" autocomplete="off" />
+        <div class="hint">Private, permanent, letters/numbers/underscore only. Used with your email to sign in and reset your password — never shown to other players.</div>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label for="suDisplayName">Display name</label>
+        <input type="text" id="suDisplayName" required minlength="3" maxlength="20" autocomplete="off" />
+        <div class="hint">Public — this is what other players see. Changeable once a week.</div>
+      </div>
+      <button type="submit" class="btn" style="width:100%;">Create account</button>
+    </form>
+  </div>
+
+  <!-- Signed in, no profile yet (Google sign-in only — Google doesn't give us
+       a username/display name, so this is where that gets collected).
+       Also serves as a fallback for the rare case an email signup's profile
+       write didn't complete. -->
+  <div class="card" id="profileCard" hidden>
+    <div>
+      <h1>Finish setting up</h1>
+      <p class="sub">Two names: one private, one public.</p>
+    </div>
+    <div class="msg" id="profileMsg"></div>
+    <form id="profileForm">
+      <div class="field" style="margin-bottom:12px;">
+        <label for="pfUsername">Username</label>
+        <input type="text" id="pfUsername" required minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+" autocomplete="off" />
+        <div class="hint">Private, permanent, letters/numbers/underscore only. Used to sign in — never shown to other players.</div>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label for="pfDisplayName">Display name</label>
+        <input type="text" id="pfDisplayName" required minlength="3" maxlength="20" autocomplete="off" />
+        <div class="hint">Public — this is what other players see. Changeable once a week.</div>
+      </div>
+      <button type="submit" class="btn" style="width:100%;">Finish setup</button>
+    </form>
+  </div>
+
+  <!-- Signed in, profile exists -->
+  <div class="card" id="accountCard" hidden>
+    <div class="profileRow">
+      <div class="who">
+        <span class="dn" id="acDisplayName"></span>
+        <span class="un" id="acUsername"></span>
+      </div>
+    </div>
+
+    <div class="linkSection">
+      <p class="sub" style="margin:0 0 10px;">Link the desktop app to this account.</p>
+      <button type="button" class="btn btn-ghost" id="linkGenBtn" style="width:100%;">Link a device</button>
+      <div id="linkCodeBox" hidden>
+        <div class="codeDisplay" id="linkCodeText"></div>
+        <p class="sub" id="linkStatus" style="text-align:center; margin:8px 0 0;">Enter this code in the desktop app.</p>
+      </div>
+    </div>
+
+    <button type="button" class="btn btn-ghost" id="signOutBtn">Sign out</button>
+  </div>
+
+  <div class="card" id="loadingCard">
+    <p class="sub" style="margin:0;">Loading…</p>
+  </div>
+
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
+    createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, writeBatch, serverTimestamp,
+    setDoc, deleteDoc, onSnapshot, Timestamp,
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    projectId: "blockwire-3d2a2",
+    appId: "1:1026888955553:web:83c4cae0e52e80f6df62e0",
+    storageBucket: "blockwire-3d2a2.firebasestorage.app",
+    apiKey: "AIzaSyDpkfHXQu9G0YxZRjCt1ZNRQoGoe2vEopY",
+    authDomain: "blockwire-3d2a2.firebaseapp.com",
+    messagingSenderId: "1026888955553",
+    measurementId: "G-LRPT8NTSVY",
+  };
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const $ = (id) => document.getElementById(id);
+  const cards = { auth: $('authCard'), profile: $('profileCard'), account: $('accountCard'), loading: $('loadingCard') };
+  function showCard(name) {
+    for (const k in cards) cards[k].hidden = (k !== name);
+  }
+  function showMsg(el, text, kind) {
+    el.textContent = text;
+    el.className = 'msg show' + (kind ? ' ' + kind : '');
+  }
+  function hideMsg(el) { el.className = 'msg'; }
+
+  // --- sign in / sign up tabs ---
+  const tabSignIn = $('tabSignIn'), tabSignUp = $('tabSignUp');
+  const signInForm = $('signInForm'), signUpForm = $('signUpForm');
+  tabSignIn.addEventListener('click', () => {
+    tabSignIn.setAttribute('aria-selected', 'true'); tabSignUp.setAttribute('aria-selected', 'false');
+    signInForm.hidden = false; signUpForm.hidden = true; hideMsg($('authMsg'));
+  });
+  tabSignUp.addEventListener('click', () => {
+    tabSignIn.setAttribute('aria-selected', 'false'); tabSignUp.setAttribute('aria-selected', 'true');
+    signInForm.hidden = true; signUpForm.hidden = false; hideMsg($('authMsg'));
+  });
+
+  function authErrorMessage(err) {
+    const code = err && err.code || '';
+    if (code === 'auth/email-already-in-use') return 'That email already has an account — try signing in instead.';
+    if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') return 'Wrong email or password.';
+    if (code === 'auth/weak-password') return 'Password is too weak — use at least 8 characters.';
+    if (code === 'auth/invalid-email') return 'That email address looks wrong.';
+    if (code === 'auth/popup-closed-by-user') return 'Google sign-in was closed before finishing.';
+    return (err && err.message) || 'Something went wrong.';
+  }
+
+  $('googleBtn').addEventListener('click', async () => {
+    hideMsg($('authMsg'));
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch (err) { showMsg($('authMsg'), authErrorMessage(err), 'err'); }
+  });
+
+  signInForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideMsg($('authMsg'));
+    try { await signInWithEmailAndPassword(auth, $('siEmail').value.trim(), $('siPassword').value); }
+    catch (err) { showMsg($('authMsg'), authErrorMessage(err), 'err'); }
+  });
+
+  // Shared by both the email signup form (username+displayName collected
+  // up front) and the profile-setup form (Google sign-in's follow-up step,
+  // since Google doesn't give us either). Validates, checks availability,
+  // and writes usernames/users/profiles as one atomic batch.
+  function validateUsername(username) { return /^[a-zA-Z0-9_]{3,20}$/.test(username); }
+  function validateDisplayName(displayName) { return displayName.length >= 3 && displayName.length <= 20; }
+  async function claimUsernameAndProfile(user, username, displayName) {
+    const usernameLower = username.toLowerCase();
+    const existing = await getDoc(doc(db, 'usernames', usernameLower));
+    if (existing.exists()) throw { code: 'username-taken' };
+    // Atomic: claim the username + write both docs together, or none of it happens.
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'usernames', usernameLower), { uid: user.uid });
+    batch.set(doc(db, 'users', user.uid), { username, createdAt: serverTimestamp() });
+    batch.set(doc(db, 'profiles', user.uid), { displayName, lastDisplayNameChangeAt: serverTimestamp() });
+    await batch.commit();
+  }
+
+  signUpForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msgEl = $('authMsg');
+    hideMsg(msgEl);
+    const username = $('suUsername').value.trim();
+    const displayName = $('suDisplayName').value.trim();
+    if (!validateUsername(username)) {
+      showMsg(msgEl, 'Username must be 3-20 characters: letters, numbers, underscore only.', 'err');
+      return;
+    }
+    if (!validateDisplayName(displayName)) {
+      showMsg(msgEl, 'Display name must be 3-20 characters.', 'err');
+      return;
+    }
+    const submitBtn = e.target.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    // Check availability BEFORE creating the auth account, so a taken
+    // username doesn't leave behind an account with no profile.
+    try {
+      const existing = await getDoc(doc(db, 'usernames', username.toLowerCase()));
+      if (existing.exists()) { showMsg(msgEl, 'That username is taken.', 'err'); submitBtn.disabled = false; return; }
+    } catch (err) {
+      showMsg(msgEl, (err && err.message) || 'Could not check that username.', 'err');
+      submitBtn.disabled = false;
+      return;
+    }
+    let user;
+    try {
+      user = (await createUserWithEmailAndPassword(auth, $('suEmail').value.trim(), $('suPassword').value)).user;
+    } catch (err) {
+      showMsg(msgEl, authErrorMessage(err), 'err');
+      submitBtn.disabled = false;
+      return;
+    }
+    try {
+      await claimUsernameAndProfile(user, username, displayName);
+      await renderSignedIn(user);
+    } catch (err) {
+      // Auth account exists but the profile write failed (e.g. the username
+      // was just claimed by someone else in the last few seconds) — fall
+      // back to the "finish setting up" step rather than stranding them.
+      showMsg(msgEl, err && err.code === 'username-taken' ? 'That username was just taken — pick another below.' : 'Account created — finish setting up your profile below.', 'err');
+      await renderSignedIn(user);
+      submitBtn.disabled = false;
+    }
+  });
+
+  // --- profile setup (username + display name): Google sign-in's follow-up
+  // step, and the fallback if an email signup's profile write didn't land ---
+  $('profileForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msgEl = $('profileMsg');
+    hideMsg(msgEl);
+    const user = auth.currentUser;
+    if (!user) return;
+    const username = $('pfUsername').value.trim();
+    const displayName = $('pfDisplayName').value.trim();
+    if (!validateUsername(username)) {
+      showMsg(msgEl, 'Username must be 3-20 characters: letters, numbers, underscore only.', 'err');
+      return;
+    }
+    if (!validateDisplayName(displayName)) {
+      showMsg(msgEl, 'Display name must be 3-20 characters.', 'err');
+      return;
+    }
+    const submitBtn = e.target.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    try {
+      await claimUsernameAndProfile(user, username, displayName);
+      await renderSignedIn(user);
+    } catch (err) {
+      showMsg(msgEl, err && err.code === 'username-taken' ? 'That username is taken.' : ((err && err.message) || 'Could not save your profile.'), 'err');
+      submitBtn.disabled = false;
+    }
+  });
+
+  $('signOutBtn').addEventListener('click', () => signOut(auth));
+
+  // --- link a device: generate a short pairing code the desktop app reads ---
+  // Charset skips visually-ambiguous characters (0/O, 1/I) since this gets
+  // typed by hand into the app.
+  const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function randomCode(len) {
+    let out = '';
+    for (let i = 0; i < len; i++) out += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return out;
+  }
+  let unwatchLinkCode = null;
+  $('linkGenBtn').addEventListener('click', async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    $('linkGenBtn').disabled = true;
+    const code = randomCode(6);
+    const expiresAt = Timestamp.fromMillis(Date.now() + 10 * 60 * 1000);
+    try {
+      await setDoc(doc(db, 'linkCodes', code), { uid: user.uid, status: 'pending', createdAt: serverTimestamp(), expiresAt });
+    } catch (err) {
+      $('linkGenBtn').disabled = false;
+      return;
+    }
+    $('linkCodeText').textContent = code;
+    $('linkCodeText').className = 'codeDisplay';
+    $('linkStatus').textContent = 'Enter this code in the desktop app. Expires in 10 minutes.';
+    $('linkCodeBox').hidden = false;
+    $('linkGenBtn').hidden = true;
+    if (unwatchLinkCode) unwatchLinkCode();
+    unwatchLinkCode = onSnapshot(doc(db, 'linkCodes', code), (snap) => {
+      if (snap.exists() && snap.data().status === 'linked') {
+        $('linkCodeText').className = 'codeDisplay linked';
+        $('linkStatus').textContent = 'Linked!';
+        unwatchLinkCode(); unwatchLinkCode = null;
+        setTimeout(() => {
+          $('linkCodeBox').hidden = true;
+          $('linkGenBtn').hidden = false;
+          $('linkGenBtn').disabled = false;
+        }, 3000);
+      }
+    });
+  });
+
+  // --- routing: which card shows depends on auth + profile state ---
+  async function renderSignedIn(user) {
+    const usersSnap = await getDoc(doc(db, 'users', user.uid));
+    if (!usersSnap.exists()) {
+      showCard('profile');
+      return;
+    }
+    const profileSnap = await getDoc(doc(db, 'profiles', user.uid));
+    $('acUsername').textContent = '@' + usersSnap.data().username;
+    $('acDisplayName').textContent = profileSnap.exists() ? profileSnap.data().displayName : '(no display name)';
+    showCard('account');
+  }
+
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) { showCard('auth'); return; }
+    showCard('loading');
+    try { await renderSignedIn(user); }
+    catch (err) { showCard('auth'); showMsg($('authMsg'), (err && err.message) || 'Could not load your account.', 'err'); }
+  });
+</script>
+
+</body>
+</html>
