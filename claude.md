@@ -914,15 +914,40 @@ orphaning that page). Deployed.
   4m0s, Ubuntu 11m13s, Windows 7m30s) and landed in one shared draft release
   with every expected asset: `.dmg` + `.app.tar.gz` ×2 (arm64/x64 macOS),
   `.deb`/`.AppImage`/`.rpm` (Linux), `.msi`/`-setup.exe` (Windows) — 9 files
-  total. Left as a **draft** on purpose (per the `releaseDraft: true` design
-  above) — it is NOT public yet. **Needs Riz to review the draft release on
-  GitHub and click Publish** before `download.html`'s links resolve to
-  anything (they point at `releases/latest`, which only exists once a
-  non-draft release does). One rough edge from that first run — GitHub
-  flagged `actions/checkout@v4`/`actions/setup-node@v4` as targeting a
-  deprecated Node 20 runtime (harmless, auto-forced to Node 24) — bumped both
-  to `@v5` right after; re-validated with `actionlint`, not yet re-run in CI
-  since bumping action versions doesn't need re-proving the whole matrix.
+  total. One rough edge from that first run — GitHub flagged
+  `actions/checkout@v4`/`actions/setup-node@v4` as targeting a deprecated
+  Node 20 runtime (harmless, auto-forced to Node 24) — bumped both to `@v5`
+  right after; re-validated with `actionlint`.
+- **Riz's publish attempt hit a real gotcha, now fixed twice over:**
+  - He went to publish and — reasonably, since GitHub's UI doesn't make an
+    existing draft for a tag obvious — ended up creating a **second, separate
+    release object also pointed at the `online-v0.8.33` tag** by hand (empty
+    body, zero assets, just GitHub's always-present auto-generated source
+    zip), while the CI-built draft with the real 9 installers sat there
+    unpublished. Confirmed via `gh api .../releases` that both existed side
+    by side. Fixed by deleting the empty manual one and publishing the real
+    CI-built draft in its place (`gh api -X PATCH .../releases/<id> -f
+    draft=false -F prerelease=true`).
+  - Riz also correctly marked it a **prerelease** (pre-1.0), which the
+    workflow hadn't defaulted to — updated `release.yml`'s `prerelease: false`
+    → `true` so future tags match that intent automatically without relying
+    on a manual toggle every time.
+  - That prerelease flag then exposed a second, more fundamental bug in
+    `download.html`: GitHub's `releases/latest` endpoint **explicitly
+    excludes prereleases** — confirmed via `curl` that it 404s when the only
+    release is marked prerelease, which is every release until 1.0. All four
+    platform-card links were pointing at `releases/latest`, so the whole page
+    was silently broken the moment the first real release went out marked
+    prerelease. Fixed by pointing them at the plain `/releases` list instead
+    (always resolves, newest release first regardless of prerelease status),
+    and updated the page copy ("Latest release" → "Releases page," and a note
+    that a "Pre-release" badge on GitHub is expected pre-1.0, not a warning
+    sign). Verified the new links directly in a browser-preview walkthrough
+    and confirmed `/releases` returns `200` where `/releases/latest` 404s.
+  - Redeployed `download.html`; `.github/workflows/release.yml` committed and
+    pushed (not yet re-tagged — the `prerelease: true` default only affects
+    the *next* tag pushed, doesn't need to re-prove the already-working build
+    matrix).
 
 ---
 

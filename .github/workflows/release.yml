@@ -73,5 +73,7 @@ jobs:
 
             See CLAUDE.md in the repo for what changed.
           releaseDraft: true
-          prerelease: false
+          # Everything before 1.0 is a prerelease — flip this once the game
+          # actually reaches 1.0 (see CLAUDE.md's versioning section).
+          prerelease: true
           args: ${{ matrix.args }}
