@@ -10,6 +10,7 @@ pub fn run() {
       lan::stop_lan_server,
       lan::lan_broadcast,
       lan::lan_send_to,
+      lan::lan_kick_client,
       lan::get_lan_ip,
     ])
     .setup(|app| {

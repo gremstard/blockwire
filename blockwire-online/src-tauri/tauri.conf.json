@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Blockwire",
-  "version": "0.8.34",
+  "version": "0.8.35",
   "identifier": "com.braindumpinneractive.blockwire",
   "build": {
     "frontendDist": "../app"

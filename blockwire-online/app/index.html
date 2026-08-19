@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Blockwire 0.8.34 Playtest</title>
+<title>Blockwire 0.8.35 Playtest</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='0' y='0' width='16' height='16' fill='%23FF0000'/><rect x='16' y='0' width='16' height='16' fill='%2300FF00'/><rect x='0' y='16' width='16' height='16' fill='%230080FF'/><rect x='16' y='16' width='16' height='16' fill='%23FFFF00'/><g fill='%230F1216' font-family='sans-serif' font-weight='900' font-size='44'><text x='-1.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>B</text><text x='14.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>W</text></g></svg>" />
 <link href="vendor/fonts/fonts.css" rel="stylesheet">
 <script src="vendor/three.min.js"></script>
@@ -745,7 +745,7 @@
     </div>
   </div>
 </div>
-<div id="versionBadge">v0.8.34</div>
+<div id="versionBadge">v0.8.35</div>
 
 <!-- ===== App shell: main menu / settings / pause ===== -->
 <div id="menuRoot" class="scrim open">
@@ -820,11 +820,12 @@
           </div>
         </div>
 
-        <!-- Join a Game form: a LAN address (IP:port) + Connect. -->
+        <!-- Join a Game form: an address (IP:port) + the host's join code. -->
         <div id="menuJoinCol" hidden>
           <div class="menuColTitle">Join a Game</div>
           <div class="mbtns" id="mNavJoin" style="max-width:320px;">
             <input type="text" id="joinAddrInput" placeholder="192.168.1.23:7777" autocomplete="off" style="font-family:'IBM Plex Mono',monospace;" />
+            <input type="text" id="joinTokenInput" maxlength="6" placeholder="Join code" autocomplete="off" style="font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:0.1em;" />
             <button id="joinConnectBtn" class="mbtn mbtn-go">Connect</button>
             <p class="miniLabel" id="joinMsg" style="display:none;"></p>
           </div>
@@ -835,7 +836,7 @@
     <div class="menuBottomStrip">
       <span>Blockwire is free software under the AGPLv3.</span>
       <span>By playing you agree to the <button type="button" class="linklike" id="menuTosLink">Terms of Service</button>.</span>
-      <span class="mfoot" id="mSaveNote" style="margin:0;">Playtest 0.8.34</span>
+      <span class="mfoot" id="mSaveNote" style="margin:0;">Playtest 0.8.35</span>
     </div>
 
     <input id="worldFile" type="file" accept=".json,.blockwire" hidden />
@@ -7286,7 +7287,7 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
           closeMenu();
           if (hostOnLoad) {
             const res = await startHosting(7777);
-            if (res.ok) lanHostAddress = res.address;
+            if (res.ok) lanHostInfo = res;
             refreshLanPauseUI();
           }
         } else document.getElementById('mSaveNote').textContent = 'Could not load that world';
@@ -7341,6 +7342,7 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
     clearContentPane();
     document.getElementById('joinMsg').style.display = 'none';
     document.getElementById('joinAddrInput').value = '';
+    document.getElementById('joinTokenInput').value = '';
     document.getElementById('menuJoinCol').hidden = false;
     setTimeout(() => document.getElementById('joinAddrInput').focus(), 0);
   });
@@ -7349,16 +7351,22 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
     const raw = document.getElementById('joinAddrInput').value.trim();
     const m = raw.match(/^([^:]+):(\d+)$/);
     if (!m) { msgEl.textContent = 'Enter an address like 192.168.1.23:7777.'; msgEl.style.display = ''; return; }
+    const token = document.getElementById('joinTokenInput').value.trim().toUpperCase();
+    if (!token) { msgEl.textContent = 'Enter the join code the host gave you.'; msgEl.style.display = ''; return; }
     const btn = document.getElementById('joinConnectBtn');
     btn.disabled = true;
     msgEl.textContent = 'Connecting…'; msgEl.style.display = '';
     await assetsReady;
-    const res = await connectToHost(m[1], parseInt(m[2], 10));
+    const res = await connectToHost(m[1], parseInt(m[2], 10), token);
     btn.disabled = false;
     if (res.ok) { closeMenu(); }
     else { msgEl.textContent = res.error || 'Could not connect.'; }
   });
   document.getElementById('joinAddrInput').addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') { e.preventDefault(); document.getElementById('joinConnectBtn').click(); }
+    e.stopPropagation();
+  });
+  document.getElementById('joinTokenInput').addEventListener('keydown', (e) => {
     if (e.code === 'Enter') { e.preventDefault(); document.getElementById('joinConnectBtn').click(); }
     e.stopPropagation();
   });
@@ -7439,26 +7447,34 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
     if (netRole === 'host') {
       openBtn.textContent = 'Stop hosting';
       status.hidden = false;
-      status.textContent = 'Hosting at ' + (lanHostAddress || '…') + ' — share this with friends on your network.';
+      // innerHTML here is safe: every value is our own generated data (an
+      // IP:port and a random 6-char token), never anything from the network.
+      const info = lanHostInfo;
+      let html = 'Hosting at <b>' + (info ? info.address : '…') + '</b>';
+      if (info && info.publicAddress) {
+        html += ' (or <b>' + info.publicAddress + '</b> over the internet, if you\'ve forwarded this port on your router)';
+      }
+      html += '.<br>Join code: <b>' + (info ? info.token : '…') + '</b> — anyone joining needs both the address and this code.';
+      status.innerHTML = html;
     } else {
       openBtn.textContent = 'Open to LAN';
       status.hidden = netRole !== 'client';
       if (netRole === 'client') status.textContent = 'Connected to a friend\'s game.';
     }
   }
-  let lanHostAddress = null;
+  let lanHostInfo = null; // { address, publicAddress, token } from the last successful startHosting()
   document.getElementById('pOpenLan').addEventListener('click', async () => {
     const btn = document.getElementById('pOpenLan');
     if (netRole === 'host') {
       await stopHosting();
-      lanHostAddress = null;
+      lanHostInfo = null;
       refreshLanPauseUI();
       return;
     }
     btn.disabled = true;
     const res = await startHosting(7777);
     btn.disabled = false;
-    if (res.ok) { lanHostAddress = res.address; }
+    if (res.ok) { lanHostInfo = res; }
     else { document.getElementById('pSaveNote').textContent = res.error; }
     refreshLanPauseUI();
   });
@@ -7996,6 +8012,25 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
   });
 
   // --- host role ---
+  // Join token: the LAN server was built assuming a "trusted local network"
+  // (no socket auth at all, per CLAUDE.md's original design note) — fine
+  // when the only way in is your own WiFi, but port-forwarding this port to
+  // the internet (see the public-address display below) means literally
+  // anyone who finds the address could otherwise connect. A random 6-char
+  // token, checked on 'hello' before any world data goes out, closes that
+  // hole for both LAN and WAN joins — always required, not just over WAN,
+  // so there's only one code path to reason about.
+  const HOST_TOKEN_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function randomHostToken(len) {
+    let out = '';
+    for (let i = 0; i < len; i++) out += HOST_TOKEN_CHARS[Math.floor(Math.random() * HOST_TOKEN_CHARS.length)];
+    return out;
+  }
+  let netHostToken = null;
+  // clientIds that have sent a 'hello' with the correct token — every OTHER
+  // message type is ignored from a clientId not in this set, so a client
+  // can't skip 'hello' entirely and just start firing blockRequest/chat/etc.
+  const netAuthedClients = new Set();
   async function startHosting(port) {
     if (!TAURI) return { ok: false, error: 'LAN hosting only works in the desktop app.' };
     if (netRole) return { ok: false, error: 'Already networked.' };
@@ -8003,13 +8038,27 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
       const boundPort = await TAURI.core.invoke('start_lan_server', { port });
       netRole = 'host';
       netPlayerId = 0;
+      netHostToken = randomHostToken(6);
       let ip = '127.0.0.1';
       try { ip = await TAURI.core.invoke('get_lan_ip'); } catch (e) {}
+      // Public IP, for port-forwarded WAN hosting — best-effort: if this
+      // fails (offline, the echo service is unreachable/blocked), LAN
+      // hosting still works fine, we just can't show a public address.
+      let publicIp = null;
+      try {
+        const res = await fetch('https://api.ipify.org?format=json');
+        if (res.ok) publicIp = (await res.json()).ip;
+      } catch (e) { /* no public address to show — not fatal */ }
       await TAURI.event.listen('lan-message', (evt) => handleHostInbound(evt.payload.clientId, evt.payload.text));
       await TAURI.event.listen('lan-client-connected', (evt) => handleClientConnected(evt.payload.clientId));
       await TAURI.event.listen('lan-client-disconnected', (evt) => handleClientDisconnected(evt.payload.clientId));
       netResyncTimer = setInterval(() => { if (netRole === 'host') netSend({ type: 'worldSync', world: serializeWorld() }); }, 10000);
-      return { ok: true, address: ip + ':' + boundPort };
+      return {
+        ok: true,
+        address: ip + ':' + boundPort,
+        publicAddress: publicIp ? publicIp + ':' + boundPort : null,
+        token: netHostToken,
+      };
     } catch (err) {
       netRole = null;
       return { ok: false, error: String(err) };
@@ -8019,23 +8068,38 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
     if (netRole !== 'host') return;
     clearInterval(netResyncTimer);
     try { await TAURI.core.invoke('stop_lan_server'); } catch (e) {}
-    netRole = null; netPlayerId = null;
+    netRole = null; netPlayerId = null; netHostToken = null;
+    netAuthedClients.clear();
     clearAllRemotePlayers();
   }
-  async function handleClientConnected(clientId) {
-    const msg = { type: 'welcome', playerId: clientId, world: serializeWorld() };
-    try { await TAURI.core.invoke('lan_send_to', { clientId, text: JSON.stringify(msg) }); } catch (e) {}
-  }
+  // Deliberately does nothing — a raw TCP/WS connection alone no longer
+  // grants anything. The world only goes out once 'hello' carries the right
+  // token (see handleHostInbound). Kept as a named function (rather than
+  // removing the listener registration) so the event wiring above stays
+  // simple and symmetric with lan-client-disconnected.
+  function handleClientConnected(clientId) {}
   function handleClientDisconnected(clientId) {
+    netAuthedClients.delete(clientId);
     netSend({ type: 'playerLeave', playerId: clientId });
     removeRemotePlayer(clientId);
   }
   function handleHostInbound(clientId, text) {
     let msg; try { msg = JSON.parse(text); } catch (e) { return; }
     if (msg.type === 'hello') {
+      if (msg.token !== netHostToken) {
+        TAURI.core.invoke('lan_send_to', { clientId, text: JSON.stringify({ type: 'authError', error: 'Wrong join code.' }) }).catch(() => {});
+        TAURI.core.invoke('lan_kick_client', { clientId }).catch(() => {});
+        return;
+      }
+      netAuthedClients.add(clientId);
+      const welcomeMsg = { type: 'welcome', playerId: clientId, world: serializeWorld() };
+      TAURI.core.invoke('lan_send_to', { clientId, text: JSON.stringify(welcomeMsg) }).catch(() => {});
       netSend({ type: 'playerJoin', playerId: clientId, displayName: msg.displayName });
       addChatMessage(null, (msg.displayName || 'A player') + ' joined');
-    } else if (msg.type === 'blockRequest') {
+      return;
+    }
+    if (!netAuthedClients.has(clientId)) return; // never sent a valid hello — ignore everything else
+    if (msg.type === 'blockRequest') {
       setBlock(msg.wx, msg.y, msg.wz, msg.blockType, msg.colorHex); // broadcasts via setBlock's own hook, confirming back to the requester too
     } else if (msg.type === 'playerState') {
       updateRemotePlayer(clientId, msg);
@@ -8047,7 +8111,7 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
   }
 
   // --- client role ---
-  function connectToHost(ip, port) {
+  function connectToHost(ip, port, token) {
     return new Promise((resolve) => {
       if (netRole) { resolve({ ok: false, error: 'Already networked.' }); return; }
       let settled = false;
@@ -8057,7 +8121,7 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
       } catch (err) {
         resolve({ ok: false, error: String(err) }); return;
       }
-      ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', displayName: localPlayerName() }));
+      ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', displayName: localPlayerName(), token }));
       ws.onmessage = (evt) => {
         let msg; try { msg = JSON.parse(evt.data); } catch (e) { return; }
         if (msg.type === 'welcome' && !settled) {
@@ -8068,6 +8132,12 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
           netSuppressBroadcast = true;
           try { deserializeWorld(msg.world); } finally { netSuppressBroadcast = false; }
           resolve({ ok: true });
+          return;
+        }
+        if (msg.type === 'authError' && !settled) {
+          settled = true;
+          resolve({ ok: false, error: msg.error || 'Could not join.' });
+          try { ws.close(); } catch (e) {}
           return;
         }
         handleClientInbound(msg);

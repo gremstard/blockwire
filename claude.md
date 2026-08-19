@@ -5,7 +5,7 @@
 > known issues, and the full 4-stage plan to online.
 > Companion: `Blockwire-Design-Doc.md` holds the deeper design rationale (§ refs below).
 
-**Current version:** v0.8.34 (`blockwire-online/`) / v0.8.27 (`public/blockwire.html`) ·
+**Current version:** v0.8.35 (`blockwire-online/`) / v0.8.27 (`public/blockwire.html`) ·
 **Milestone:** bwplayer (0.8) complete; pre-online cleanup done; Stage 1 Milestones 1–4
 (fork + desktop shell; accounts + device linking; multi-world saves + menu redesign;
 LAN multiplayer) all built; the Milestone 3 main menu was then **rebuilt from scratch**
@@ -962,18 +962,89 @@ turned on, a real cost/infra decision Riz didn't want to make for this.
   (Whitelist/Public, see below) is next in line to benefit from this once
   its own infra questions are answered.
 
+**Milestone 7 — world hosting over the internet via port forwarding
+(Phase 1 of the world-hosting design note below) — built:** Riz's idea for
+sidestepping the original "who pays for dedicated servers" blocker on
+Public/Whitelist hosting — instead of standing up real server infrastructure,
+let a player's own machine be reachable from the internet (same
+host-authoritative model Milestone 4 already built for LAN), just with the
+router's port forwarded instead of only the local network. Scoped as Phase 1
+of 3 (see the still-open Phase 2/3 notes below); the phasing and the security
+concern it surfaces were reviewed with Riz before writing any code.
+- **Real problem surfaced and fixed first**: the LAN server was built
+  assuming a "trusted local network" — explicitly documented as having "no
+  socket auth/encryption" (see Milestone 4 above). That assumption breaks
+  completely the moment a port is forwarded to the public internet — anyone
+  who finds the address could otherwise connect and place/mine blocks in a
+  stranger's world. Fixed with a random 6-character **join token**,
+  generated fresh each time hosting starts, checked on the client's `hello`
+  before any world data goes out — and required for *every* join, LAN or
+  WAN, so there's only one code path to reason about rather than a
+  weaker LAN-only mode and a hardened WAN-only mode.
+- **A gap that needed a second pass, caught during self-review before
+  shipping**: gating just the `hello`/`welcome` exchange isn't enough on its
+  own — a malicious client could simply skip sending `hello` at all and fire
+  `blockRequest`/`chat`/`playerState` messages directly, which the host was
+  processing unconditionally regardless of clientId. Fixed with a
+  `netAuthedClients` set — only a clientId that has sent a `hello` with the
+  correct token is in it, and every other inbound message type is silently
+  ignored from anyone not in the set. Cleared on disconnect and on
+  `stopHosting()`.
+- **Rust**: new `lan_kick_client` command (mirrors `stop_lan_server`'s
+  already-proven fix — abort the per-connection task tracked in `TaskMap`,
+  not just drop the outbound channel, since that's what actually closes the
+  socket) — used to forcibly disconnect a client that sends the wrong token.
+  `cargo check` clean.
+- **Public IP display**: `startHosting()` now also fetches the host's public
+  IP via `api.ipify.org` (a public, unauthenticated, CORS-open GET — no new
+  Rust/Tauri command needed, the webview just calls `fetch()` directly) and
+  shows it in the pause-menu hosting status alongside the existing LAN
+  address, both with the join code, plus a note that the public address only
+  works if the port has actually been forwarded on the router. Best-effort:
+  if the fetch fails (offline, service unreachable), LAN hosting still works
+  fine, the pause panel just won't show a public address.
+- **Join a Game form** gained a second field for the join code (6-char,
+  same uppercase/monospace treatment as the account-linking codes
+  elsewhere in the app); both address and code are required before
+  `connectToHost()` is even attempted. Client-side handles a new
+  `authError` message type (wrong code) distinctly from a plain connection
+  failure, so the error the player sees is accurate.
+- **Honest, known limitation, not silently glossed over**: some home
+  internet connections (common on certain ISPs, especially mobile/cellular
+  or budget providers) sit behind CGNAT and have no forwardable public IP at
+  all — port forwarding is simply impossible for those users. Not a bug to
+  fix, just a real ceiling on "anyone can self-host publicly" that's worth
+  knowing going in.
+- **Verification, honestly bounded the same way Milestone 4's was**: harness
+  clean (`SYNTAX OK`/`RUNTIME OK`), `cargo check` clean, and a browser-preview
+  walkthrough of everything reachable *without* a real second Tauri instance —
+  the Join form correctly demands a join code before attempting to connect,
+  and correctly reports "LAN hosting only works in the desktop app" outside
+  Tauri with no crash. **What I structurally could not verify myself**
+  (same limitation as the original LAN build — no tool here can run two real
+  Tauri windows): a live host actually rejecting a wrong-token join attempt,
+  a live host accepting a correct one, and the public-address/port-forwarding
+  path actually working end-to-end over a real internet connection. Needs
+  Riz's hands, same as the original cross-machine LAN test still pending.
+
 **Design notes still not built (recorded so they're not lost):**
-- **1.0/Stage 3 — world hosting model:** a saved world gets a visibility setting,
-  **Whitelist** or **Public**. Public adds a name/capacity/description and lists it in
-  the public server directory. Whitelist has its own **"Friends allowed"** toggle —
-  controls both whether friends can see what world you're in AND whether they can
-  join it. Whitelisting a specific person happens via their **private ID, not
-  displayName** (a famous/popular player's public display name would get flooded with
-  join attempts otherwise) — either a chat command or a settings-panel entry.
-  **Explicitly flagged as a real gap**: hosting from the "My Worlds" list (i.e. what
-  Milestone 4's "Open to LAN" is) dies the moment you close the game — Public/directory
-  listing implies a real always-on dedicated-hosting story, not just LAN, which is
-  genuinely Stage 3 scope (§7 already says as much), not an extension of Milestone 4.
+- **1.0/Stage 3 — world hosting model, Phases 2 and 3:** Phase 1 (above) is
+  manual address+code sharing, no directory, no friends-aware visibility.
+  Still open: **Phase 2** — Whitelist by private ID, so a friend sees "so-and-so
+  is hosting" and can join with one click instead of being manually sent an
+  address and code (needs a small Firestore collection tracking "currently
+  hosting" per user, cleaned up via a heartbeat/TTL since a host can vanish
+  anytime, scoped through `friendLinks`). **Phase 3** — a public directory:
+  name/capacity/description, listed and browsable by anyone. The original
+  design note's **"Friends allowed" toggle** (controls both whether friends
+  can see what world you're in AND whether they can join) belongs in Phase 2.
+  Public listing (Phase 3) is the highest-risk version of the auth question
+  Milestone 7 already had to answer once — worth doing last, once the join-
+  token approach has been proven out for real by Riz's pending hands-on test.
+  Still true from the original note: hosting from "My Worlds" (Milestone 4's
+  "Open to LAN," now extended to WAN by Milestone 7) dies the moment you
+  close the game — an always-on host is a different, bigger story than
+  either of these phases.
 - ~~Stage 2 — main-menu redesign concept~~ — **built.** This was the 3-band/
   3-column layout description; it shipped as Milestone 3.1 (main menu rebuild)
   and 3.2 (contrast fix), see above. Removed from "not built yet."

@@ -185,6 +185,21 @@ pub async fn stop_lan_server(state: State<'_, LanServerState>) -> Result<(), Str
     Ok(())
 }
 
+// Forcibly disconnect one client — used when their 'hello' carries the wrong
+// join token (see index.html's handleHostInbound). Same abort-the-task
+// mechanism as stop_lan_server, just for a single client id instead of all
+// of them.
+#[tauri::command]
+pub async fn lan_kick_client(state: State<'_, LanServerState>, client_id: u32) -> Result<(), String> {
+    let guard = state.inner.lock().await;
+    let handle = guard.as_ref().ok_or("Not hosting.")?;
+    if let Some(task) = handle.tasks.lock().await.remove(&client_id) {
+        task.abort();
+    }
+    handle.clients.lock().await.remove(&client_id);
+    Ok(())
+}
+
 // Send to every connected client. `except` optionally skips one client id —
 // used to avoid echoing a message back to the client that just sent it,
 // though most of our protocol WANTS the echo (single source of truth), so

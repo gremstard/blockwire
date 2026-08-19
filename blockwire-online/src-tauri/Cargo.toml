@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.8.34"
+version = "0.8.35"
 description = "Blockwire desktop client"
 authors = ["Brain Dump Inneractive"]
 license = "AGPL-3.0"
