@@ -114,12 +114,32 @@
   .profileRow .who .un { font-family: var(--mono); font-size: 12px; color: var(--dim); }
 
   .linkSection { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; }
+  .section { border-top: 1px solid var(--line); padding: 16px 0; }
   .codeDisplay {
     font-family: var(--mono); font-size: 28px; letter-spacing: 0.14em;
     text-align: center; color: var(--p-yel); background: var(--void);
     border: 1px solid var(--line); padding: 14px; margin-top: 12px;
   }
   .codeDisplay.linked { color: var(--p-grn); }
+  .codeDisplay.idDisplay { font-size: 15px; letter-spacing: 0.05em; margin-top: 0; cursor: pointer; word-break: break-all; }
+  .codeDisplay.idDisplay:hover { border-color: var(--dim); }
+  .btn-link {
+    background: none; border: 0; color: var(--dim); font-family: var(--body);
+    font-size: 12.5px; text-decoration: underline; cursor: pointer; padding: 0;
+  }
+  .btn-link:hover { color: var(--chalk); }
+  .friendRow {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px;
+  }
+  .friendRow:last-child { border-bottom: 0; }
+  .friendRow .fname { flex: 1; }
+  .friendRow .btn-ghost { width: auto; padding: 5px 12px; font-size: 12.5px; }
+  .friendGroupLabel {
+    font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: 0.04em;
+    text-transform: uppercase; margin: 12px 0 4px;
+  }
+  .friendGroupLabel:first-child { margin-top: 0; }
 
   [hidden] { display: none !important; }
 </style>
@@ -178,10 +198,13 @@
         <label for="siEmail">Email</label>
         <input type="email" id="siEmail" autocomplete="email" required />
       </div>
-      <div class="field" style="margin-bottom:14px;">
+      <div class="field" style="margin-bottom:8px;">
         <label for="siPassword">Password</label>
         <input type="password" id="siPassword" autocomplete="current-password" required />
       </div>
+      <p style="text-align:right; margin:0 0 14px;">
+        <button type="button" class="btn-link" id="forgotPwBtn">Forgot password?</button>
+      </p>
       <button type="submit" class="btn" style="width:100%;">Sign in</button>
     </form>
 
@@ -244,7 +267,34 @@
       </div>
     </div>
 
-    <div class="linkSection">
+    <div class="section">
+      <p class="sub" style="margin:0 0 10px;">Display name — public, changeable once a week.</p>
+      <div class="msg" id="dnMsg"></div>
+      <form id="dnForm" style="display:flex; gap:8px;">
+        <input type="text" id="dnInput" minlength="3" maxlength="20" autocomplete="off" style="flex:1;" />
+        <button type="submit" class="btn btn-ghost" style="width:auto; padding:0 16px;">Save</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <p class="sub" style="margin:0 0 10px;">Your private ID — hand this to a friend so they can add you. Never shown to anyone else.</p>
+      <div class="codeDisplay idDisplay" id="privateIdText" title="Click to copy"></div>
+      <p class="sub" id="privateIdCopyNote" style="text-align:center; margin:6px 0 0; font-size:12px; min-height:1.2em;"></p>
+    </div>
+
+    <div class="section" id="friendsSection">
+      <p class="sub" style="margin:0 0 10px;">Friends</p>
+      <div class="msg" id="friendsMsg"></div>
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <input type="text" id="addFriendInput" placeholder="Friend's private ID" autocomplete="off" style="flex:1;" />
+        <button type="button" class="btn btn-ghost" id="addFriendBtn" style="width:auto; padding:0 16px;">Add</button>
+      </div>
+      <div id="incomingRequests"></div>
+      <div id="outgoingRequests"></div>
+      <div id="friendsList"></div>
+    </div>
+
+    <div class="section">
       <p class="sub" style="margin:0 0 10px;">Link the desktop app to this account.</p>
       <button type="button" class="btn btn-ghost" id="linkGenBtn" style="width:100%;">Link a device</button>
       <div id="linkCodeBox" hidden>
@@ -253,6 +303,7 @@
       </div>
     </div>
 
+    <button type="button" class="btn btn-ghost" id="changePwBtn">Change password</button>
     <button type="button" class="btn btn-ghost" id="signOutBtn">Sign out</button>
   </div>
 
@@ -267,10 +318,12 @@
   import {
     getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup,
     createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+    sendPasswordResetEmail,
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, writeBatch, serverTimestamp,
     setDoc, deleteDoc, onSnapshot, Timestamp,
+    collection, query, where, updateDoc,
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -309,6 +362,17 @@
     signInForm.hidden = true; signUpForm.hidden = false; hideMsg($('authMsg'));
   });
 
+  // Same message whether or not the email has an account — never reveal
+  // account existence either way (matches Firebase Auth's own default
+  // enumeration-safe behavior for this exact call).
+  $('forgotPwBtn').addEventListener('click', async () => {
+    const msgEl = $('authMsg');
+    const email = $('siEmail').value.trim();
+    if (!email) { showMsg(msgEl, 'Enter your email above, then click "Forgot password?" again.', 'err'); return; }
+    try { await sendPasswordResetEmail(auth, email); } catch (err) { /* still show the same message below */ }
+    showMsg(msgEl, 'If that email has an account, a reset link is on its way.', 'ok');
+  });
+
   function authErrorMessage(err) {
     const code = err && err.code || '';
     if (code === 'auth/email-already-in-use') return 'That email already has an account — try signing in instead.';
@@ -335,19 +399,49 @@
   // Shared by both the email signup form (username+displayName collected
   // up front) and the profile-setup form (Google sign-in's follow-up step,
   // since Google doesn't give us either). Validates, checks availability,
-  // and writes usernames/users/profiles as one atomic batch.
+  // and writes usernames/users/profiles/privateIds as one atomic batch.
   function validateUsername(username) { return /^[a-zA-Z0-9_]{3,20}$/.test(username); }
   function validateDisplayName(displayName) { return displayName.length >= 3 && displayName.length <= 20; }
+  // Skips visually-ambiguous characters, same spirit as the link code's
+  // charset — this one's long (20 chars from a 58-char set, ~117 bits) since
+  // it's permanent and needs to resist enumeration, not just be typo-resistant.
+  const PRIVATE_ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  function randomPrivateId(len) {
+    const bytes = new Uint8Array(len);
+    crypto.getRandomValues(bytes);
+    let out = '';
+    for (let i = 0; i < len; i++) out += PRIVATE_ID_CHARS[bytes[i] % PRIVATE_ID_CHARS.length];
+    return out;
+  }
   async function claimUsernameAndProfile(user, username, displayName) {
     const usernameLower = username.toLowerCase();
     const existing = await getDoc(doc(db, 'usernames', usernameLower));
     if (existing.exists()) throw { code: 'username-taken' };
-    // Atomic: claim the username + write both docs together, or none of it happens.
+    const privateId = randomPrivateId(20);
+    // Atomic: claim the username + write all docs together, or none of it happens.
     const batch = writeBatch(db);
     batch.set(doc(db, 'usernames', usernameLower), { uid: user.uid });
-    batch.set(doc(db, 'users', user.uid), { username, createdAt: serverTimestamp() });
+    batch.set(doc(db, 'users', user.uid), { username, createdAt: serverTimestamp(), privateId });
     batch.set(doc(db, 'profiles', user.uid), { displayName, lastDisplayNameChangeAt: serverTimestamp() });
+    batch.set(doc(db, 'privateIds', privateId), { uid: user.uid });
     await batch.commit();
+  }
+  // Accounts created before privateId existed won't have one — generate and
+  // backfill it once, the one narrow update the security rules allow for an
+  // existing /users/{uid} doc. Retries on the rare collision (id already taken).
+  async function ensurePrivateId(user, currentUsersData) {
+    if (currentUsersData.privateId) return currentUsersData.privateId;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const privateId = randomPrivateId(20);
+      try {
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'users', user.uid), { privateId });
+        batch.set(doc(db, 'privateIds', privateId), { uid: user.uid });
+        await batch.commit();
+        return privateId;
+      } catch (err) { /* collision or race — try again with a fresh id */ }
+    }
+    return null;
   }
 
   signUpForm.addEventListener('submit', async (e) => {
@@ -470,6 +564,201 @@
     });
   });
 
+  // --- display name (My Account) ---
+  $('dnForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msgEl = $('dnMsg');
+    hideMsg(msgEl);
+    const user = auth.currentUser;
+    if (!user) return;
+    const displayName = $('dnInput').value.trim();
+    if (!validateDisplayName(displayName)) { showMsg(msgEl, 'Display name must be 3-20 characters.', 'err'); return; }
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      await updateDoc(doc(db, 'profiles', user.uid), { displayName, lastDisplayNameChangeAt: serverTimestamp() });
+      $('acDisplayName').textContent = displayName;
+      showMsg(msgEl, 'Saved.', 'ok');
+    } catch (err) {
+      showMsg(msgEl, (err && err.code === 'permission-denied')
+        ? 'You can only change your display name once a week.'
+        : ((err && err.message) || 'Could not save.'), 'err');
+    }
+    btn.disabled = false;
+  });
+
+  // --- private ID: click to copy ---
+  $('privateIdText').addEventListener('click', () => {
+    const text = $('privateIdText').textContent;
+    if (!text || text.startsWith('(')) return;
+    navigator.clipboard.writeText(text).then(() => {
+      $('privateIdCopyNote').textContent = 'Copied ✓';
+      setTimeout(() => { $('privateIdCopyNote').textContent = ''; }, 1400);
+    });
+  });
+
+  // --- change password: email yourself a reset link while signed in ---
+  $('changePwBtn').addEventListener('click', async () => {
+    const user = auth.currentUser;
+    if (!user || !user.email) return;
+    const btn = $('changePwBtn');
+    const original = btn.textContent;
+    btn.disabled = true;
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      btn.textContent = 'Check your email';
+    } catch (err) {
+      btn.textContent = 'Could not send — try again';
+    }
+    setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 4000);
+  });
+
+  // --- friends ---
+  // displayName isn't character-restricted at signup (only length-checked),
+  // so friend rows are built with textContent/DOM nodes throughout, never
+  // innerHTML with an interpolated name.
+  const displayNameCache = new Map(); // uid -> displayName
+  async function getDisplayName(uid) {
+    if (displayNameCache.has(uid)) return displayNameCache.get(uid);
+    const snap = await getDoc(doc(db, 'profiles', uid));
+    const name = snap.exists() ? snap.data().displayName : '(unknown player)';
+    displayNameCache.set(uid, name);
+    return name;
+  }
+  function friendRow(name, buttons) {
+    const row = document.createElement('div'); row.className = 'friendRow';
+    const nameEl = document.createElement('span'); nameEl.className = 'fname'; nameEl.textContent = name;
+    row.appendChild(nameEl);
+    for (const [label, handler] of buttons) {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'btn btn-ghost'; btn.textContent = label;
+      btn.addEventListener('click', handler);
+      row.appendChild(btn);
+    }
+    return row;
+  }
+  function friendsErr(err) { showMsg($('friendsMsg'), (err && err.message) || 'Something went wrong.', 'err'); }
+
+  let friendLinksA = [], friendLinksB = [], friendUnsubA = null, friendUnsubB = null;
+  function watchFriends(user) {
+    if (friendUnsubA) friendUnsubA();
+    if (friendUnsubB) friendUnsubB();
+    friendUnsubA = onSnapshot(query(collection(db, 'friendLinks'), where('a', '==', user.uid)), (snap) => {
+      friendLinksA = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderFriends(user);
+    }, friendsErr);
+    friendUnsubB = onSnapshot(query(collection(db, 'friendLinks'), where('b', '==', user.uid)), (snap) => {
+      friendLinksB = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderFriends(user);
+    }, friendsErr);
+  }
+  function stopWatchingFriends() {
+    if (friendUnsubA) { friendUnsubA(); friendUnsubA = null; }
+    if (friendUnsubB) { friendUnsubB(); friendUnsubB = null; }
+    friendLinksA = []; friendLinksB = [];
+  }
+  // Two separate onSnapshot listeners (where a==uid, where b==uid) both call
+  // this, and can fire close together — without a guard, a slower in-flight
+  // call (still awaiting getDisplayName mid-loop) resumes and appends AFTER
+  // a newer call already cleared+rebuilt the same containers, producing
+  // duplicate rows. A monotonic token makes every render check, after each
+  // await, whether a newer render has since started — if so it abandons
+  // itself instead of writing stale results into the DOM.
+  let friendsRenderToken = 0;
+  async function renderFriends(user) {
+    const myToken = ++friendsRenderToken;
+    const all = [...friendLinksA, ...friendLinksB];
+    const incoming = all.filter((l) => l.status === 'pending' && l.requestedBy !== user.uid);
+    const outgoing = all.filter((l) => l.status === 'pending' && l.requestedBy === user.uid);
+    const friends = all.filter((l) => l.status === 'friends');
+
+    const incomingEl = $('incomingRequests'), outgoingEl = $('outgoingRequests'), listEl = $('friendsList');
+    incomingEl.innerHTML = ''; outgoingEl.innerHTML = ''; listEl.innerHTML = '';
+
+    if (incoming.length) {
+      const label = document.createElement('div'); label.className = 'friendGroupLabel'; label.textContent = 'Requests';
+      incomingEl.appendChild(label);
+    }
+    for (const l of incoming) {
+      const otherUid = l.a === user.uid ? l.b : l.a;
+      const name = await getDisplayName(otherUid);
+      if (myToken !== friendsRenderToken) return;
+      incomingEl.appendChild(friendRow(name, [
+        ['Accept', () => updateDoc(doc(db, 'friendLinks', l.id), { status: 'friends', respondedAt: serverTimestamp() }).catch(friendsErr)],
+        ['Decline', () => deleteDoc(doc(db, 'friendLinks', l.id)).catch(friendsErr)],
+      ]));
+    }
+
+    if (outgoing.length) {
+      const label = document.createElement('div'); label.className = 'friendGroupLabel'; label.textContent = 'Sent';
+      outgoingEl.appendChild(label);
+    }
+    for (const l of outgoing) {
+      const otherUid = l.a === user.uid ? l.b : l.a;
+      const name = await getDisplayName(otherUid);
+      if (myToken !== friendsRenderToken) return;
+      outgoingEl.appendChild(friendRow(name, [
+        ['Cancel', () => deleteDoc(doc(db, 'friendLinks', l.id)).catch(friendsErr)],
+      ]));
+    }
+
+    if (friends.length) {
+      const label = document.createElement('div'); label.className = 'friendGroupLabel'; label.textContent = 'Friends';
+      listEl.appendChild(label);
+    }
+    for (const l of friends) {
+      const otherUid = l.a === user.uid ? l.b : l.a;
+      const name = await getDisplayName(otherUid);
+      if (myToken !== friendsRenderToken) return;
+      listEl.appendChild(friendRow(name, [
+        ['Remove', () => deleteDoc(doc(db, 'friendLinks', l.id)).catch(friendsErr)],
+      ]));
+    }
+
+    if (!incoming.length && !outgoing.length && !friends.length) {
+      const p = document.createElement('p'); p.className = 'sub'; p.style.margin = '0';
+      p.textContent = 'No friends yet — add one by their private ID above.';
+      listEl.appendChild(p);
+    }
+  }
+
+  $('addFriendBtn').addEventListener('click', async () => {
+    const msgEl = $('friendsMsg');
+    hideMsg(msgEl);
+    const user = auth.currentUser;
+    if (!user) return;
+    const id = $('addFriendInput').value.trim();
+    if (!id) { showMsg(msgEl, 'Enter a private ID first.', 'err'); return; }
+    const btn = $('addFriendBtn');
+    btn.disabled = true;
+    try {
+      const idSnap = await getDoc(doc(db, 'privateIds', id));
+      if (!idSnap.exists()) { showMsg(msgEl, 'No account found with that private ID.', 'err'); btn.disabled = false; return; }
+      const otherUid = idSnap.data().uid;
+      if (otherUid === user.uid) { showMsg(msgEl, "That's your own private ID.", 'err'); btn.disabled = false; return; }
+      const a = otherUid < user.uid ? otherUid : user.uid;
+      const b = otherUid < user.uid ? user.uid : otherUid;
+      const pairId = a + '_' + b;
+      // Checked against the live-watched friendLinksA/B lists already in
+      // memory (watchFriends), not a fresh read — reading a friendLinks doc
+      // that might not exist yet trips a real Firestore rules gotcha
+      // (resource == null on a nonexistent doc makes referencing
+      // resource.data a rules-evaluation error, not just "false"), and this
+      // avoids it entirely while also being one less round-trip.
+      const existing = [...friendLinksA, ...friendLinksB].find((l) => l.id === pairId);
+      if (existing) {
+        showMsg(msgEl, existing.status === 'friends' ? "You're already friends." : 'A request is already pending.', 'err');
+        btn.disabled = false; return;
+      }
+      await setDoc(doc(db, 'friendLinks', pairId), { a, b, status: 'pending', requestedBy: user.uid, createdAt: serverTimestamp() });
+      showMsg(msgEl, 'Friend request sent.', 'ok');
+      $('addFriendInput').value = '';
+    } catch (err) {
+      friendsErr(err);
+    }
+    btn.disabled = false;
+  });
+
   // --- routing: which card shows depends on auth + profile state ---
   async function renderSignedIn(user) {
     const usersSnap = await getDoc(doc(db, 'users', user.uid));
@@ -477,14 +766,22 @@
       showCard('profile');
       return;
     }
+    const usersData = usersSnap.data();
     const profileSnap = await getDoc(doc(db, 'profiles', user.uid));
-    $('acUsername').textContent = '@' + usersSnap.data().username;
-    $('acDisplayName').textContent = profileSnap.exists() ? profileSnap.data().displayName : '(no display name)';
+    const displayName = profileSnap.exists() ? profileSnap.data().displayName : '';
+    $('acUsername').textContent = '@' + usersData.username;
+    $('acDisplayName').textContent = displayName || '(no display name)';
+    $('dnInput').value = displayName;
     showCard('account');
+
+    const privateId = await ensurePrivateId(user, usersData);
+    $('privateIdText').textContent = privateId || '(could not load — try reloading)';
+
+    watchFriends(user);
   }
 
   onAuthStateChanged(auth, async (user) => {
-    if (!user) { showCard('auth'); return; }
+    if (!user) { stopWatchingFriends(); showCard('auth'); return; }
     showCard('loading');
     try { await renderSignedIn(user); }
     catch (err) { showCard('auth'); showMsg($('authMsg'), (err && err.message) || 'Could not load your account.', 'err'); }

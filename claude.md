@@ -821,16 +821,99 @@ whitelisting, admin/mods, and the operational tooling — before it's considered
 *(Out of scope for these four stages, tracked separately: the onboarding/video
 tutorial is 1.0 polish; combat is post-1.0 community-mod territory; vehicles are 1.1.)*
 
-**Design notes captured for later (not built yet — recorded so they're not lost):**
-- **1.0 — accounts:** password reset by email + username (the pair, since username is
-  private and not itself a login credential); resetting a password signs out every
-  other linked device on that account. A second identifier alongside `username`:
-  a long **private ID string** you hand a friend directly (out-of-band) to send a
-  friend request — distinct from `username` (also private) and `displayName` (public);
-  the point is friends can add each other without a public, guessable/spammable handle.
-  Needs a **Friends menu** and a **My Account/profile menu** (change display name —
-  still the existing 1-week rate limit — plus whatever else profile settings end up
-  living there).
+**1.0 — accounts: website Friends + private ID + My Account — built (Stage 2):**
+private ID, friend requests/friendships, display-name editing, and password
+reset are now live on `public/account.html`. Scoped to the **website only** —
+the desktop app's Friends button stays "Coming soon" (see the explicit gap
+noted below).
+- **Schema** (`firestore.rules`): `/users/{uid}` gained a `privateId` field
+  (20-char random string, `crypto.getRandomValues`-backed, ~117 bits of
+  entropy — long enough that only knowing the exact ID matters, not
+  guessing it). `/privateIds/{privateId}` is a lookup doc (`{uid}`) mirroring
+  `/usernames`' reservation pattern, with `get` open but `list` closed so the
+  collection can't be enumerated. `/friendLinks/{pairId}` is one doc per
+  **unordered** pair of accounts — doc id is `min(uidA,uidB)_max(uidA,uidB)`,
+  so a duplicate relationship can't exist by construction — with
+  `status: 'pending'|'friends'`, mirroring `/linkCodes`' already-proven
+  pending→status transition: only the party who did *not* send the request
+  can accept (flip to `friends`); either party can delete a pending doc
+  (cancel/decline) or a friends doc (unfriend).
+- **Backfill for pre-existing accounts**: `/users/{uid}` was previously fully
+  immutable after creation; added one narrow exception — a single update
+  that only ever ADDS `privateId` if the doc doesn't already have one, so
+  accounts created before this shipped (e.g. the ones already used for
+  earlier device-linking testing) get a private ID lazily on next visit to
+  the account page, not just at signup.
+- **Two real rules bugs found and fixed during testing** (both would have
+  shipped broken without the live test below — schema design alone didn't
+  catch either):
+  1. **`resource == null` gotcha.** The client's original flow read
+     `/friendLinks/{pairId}` first to check "does a relationship already
+     exist?" before creating one. For the (extremely common) first-ever
+     request between two accounts, that doc doesn't exist — and a read rule
+     that references `resource.data` without first checking `resource !=
+     null` throws a rules-evaluation error on a nonexistent doc, which the
+     client sees as `permission-denied`, not "not found." Fixed by dropping
+     the pre-check read entirely: the client now checks the already-live
+     `friendLinksA`/`friendLinksB` arrays (populated by the `onSnapshot`
+     listeners `watchFriends()` already runs) instead of a fresh read, and
+     relies on the security rules themselves to reject a genuine duplicate
+     write as a fallback — one fewer round trip and the gotcha never
+     triggers.
+  2. **Duplicate rows from a render race.** `watchFriends()` runs two
+     `onSnapshot` listeners (`where a==uid`, `where b==uid`) since a Firestore
+     query can't OR across two different fields — both call `renderFriends()`
+     on every update, and they can fire close together. `renderFriends()` is
+     `async` (awaits a `getDisplayName()` per row); without a guard, a slower
+     in-flight call resumes and appends into containers a newer call already
+     cleared and repopulated, producing duplicate rows. Fixed with a
+     monotonic `friendsRenderToken` — after every `await`, a render checks
+     whether a newer render has since started and abandons itself if so,
+     so only the latest triggered render ever actually writes to the DOM.
+- **Verified live against the real Firebase project** with two throwaway test
+  accounts (same pattern as Milestone 2's original verification): signup
+  correctly generates a private ID; display-name change correctly hit the
+  existing 7-day rate limit (proving that rule still enforces correctly);
+  sent a friend request by private ID, confirmed it appeared as "Sent" for
+  the sender and "Requests" for the recipient with no duplicate rows after
+  the race fix; Accept correctly moved it to both accounts' friends lists
+  symmetrically; Remove (unfriend), Cancel (withdraw), and the "already
+  friends"/"already pending"/"can't add yourself" guard messages all
+  confirmed working. Cleaned up the throwaway `usernames`/`privateIds` docs
+  afterward via `firebase firestore:delete` (the orphaned Auth accounts and
+  their `users`/`profiles` docs were left, same harmless precedent as
+  Milestone 2's original cleanup).
+- **Change password**: a "Change password" button on the signed-in account
+  page and a "Forgot password?" link on the sign-in tab both call Firebase
+  Auth's built-in `sendPasswordResetEmail` — deliberately the same message
+  ("if that email has an account, a reset link is on its way") regardless of
+  whether the account actually exists, so the flow can't be used to test
+  which emails are registered.
+- **Explicit gaps, not silently skipped:**
+  - The design note's "username *and* email, the pair" framing implied some
+    real verification that both match — that would need a Cloud Function (no
+    server-side code runs today outside security rules), which doesn't
+    exist. What's built is the honest version: a standard, secure,
+    enumeration-safe reset-by-email flow. Not overclaiming stronger
+    verification than actually exists.
+  - "Resetting a password signs out every other linked device" is true for
+    live Firebase Auth sessions (the website) by Firebase's own default
+    behavior — but the **desktop app has no Firebase Auth session at all**
+    (per Milestone 2's device-linking design, it only caches a static
+    `{uid, displayName}` locally after a one-time pairing code exchange), so
+    a password reset does *not* propagate to unlink an already-linked
+    desktop app. Fixing that for real needs the app to gain a live Firebase
+    Auth session — genuinely separate, bigger work, not attempted here.
+  - **Friends menu inside `blockwire-online` itself is still "Coming soon."**
+    The app has no live Firebase Auth session, so it cannot read/write
+    Firestore as the linked user at all today — building Friends *in the
+    app* isn't "add a menu," it's "give the app a real Firebase session
+    first" (e.g. the webview running the full Firebase Auth JS SDK directly,
+    same as the website, rather than only the one-off pairing-code exchange
+    device-linking currently does). Flagging this now so it isn't
+    mis-scoped as small later.
+
+**Design notes still not built (recorded so they're not lost):**
 - **1.0/Stage 3 — world hosting model:** a saved world gets a visibility setting,
   **Whitelist** or **Public**. Public adds a name/capacity/description and lists it in
   the public server directory. Whitelist has its own **"Friends allowed"** toggle —
@@ -842,20 +925,12 @@ tutorial is 1.0 polish; combat is post-1.0 community-mod territory; vehicles are
   Milestone 4's "Open to LAN" is) dies the moment you close the game — Public/directory
   listing implies a real always-on dedicated-hosting story, not just LAN, which is
   genuinely Stage 3 scope (§7 already says as much), not an extension of Milestone 4.
-- **Stage 2 — main-menu redesign concept** (supersedes Milestone 3's two-column
-  layout when we get there, not built yet): three horizontal bands top-to-bottom —
-  a thin top strip (logo, "BLOCKWIRE", sign in/log in), the main panel in the middle,
-  and a thin bottom strip (AGPLv3 + "by playing you agree to the ToS" + a link to open
-  it). The middle panel itself splits into three columns right-to-left: **rightmost**
-  = level-1 nav (Play, Settings, Friends, My Account, ...), **middle** = level-2 nav
-  for whichever level-1 item is active (e.g. Play → Offline / My Worlds / Public
-  Servers / My Servers / Back), **leftmost** = the actual content/action pane for
-  whatever's selected (a worlds list, a settings form, etc.).
-- **Downloads:** distribute Windows/Linux/Intel-Mac builds via **GitHub Releases**
-  rather than hosting the binaries ourselves — free, versioned, no bandwidth ceiling
-  to worry about (this is what made Firebase Hosting or Internet Archive feel like a
-  stretch earlier). `download.html` (still not built) would just link to
-  `github.com/gremstard/blockwire/releases/latest`.
+- ~~Stage 2 — main-menu redesign concept~~ — **built.** This was the 3-band/
+  3-column layout description; it shipped as Milestone 3.1 (main menu rebuild)
+  and 3.2 (contrast fix), see above. Removed from "not built yet."
+- ~~Downloads via GitHub Releases~~ — **built.** `download.html` exists, deep-links
+  per platform, and the Actions/Releases pipeline is proven end-to-end — see
+  the GitHub Actions section above. Removed from "not built yet."
 
 **GitHub repo — live (Stage 2):** `github.com/gremstard/blockwire`, public, AGPLv3
 `LICENSE` added (fetched verbatim from GitHub's license API, matching the license

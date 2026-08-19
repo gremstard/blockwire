@@ -8,7 +8,7 @@ rules_version = '2';
 // Split into two docs per user (private vs public) because Firestore rules
 // can't restrict individual fields within one document — only whole docs.
 //
-//   /users/{uid}        — private: { username, createdAt }.        owner-only read.
+//   /users/{uid}        — private: { username, createdAt, privateId }.  owner-only read.
 //   /profiles/{uid}      — public:  { displayName, lastDisplayNameChangeAt }. anyone can read.
 //   /usernames/{lower}   — reservation doc enforcing username uniqueness: { uid }.
 //                          doc id IS the lowercased username; anyone can read
@@ -23,6 +23,30 @@ rules_version = '2';
 // in) creates a short-lived pairing code; the app reads it and flips it from
 // pending -> linked, both unauthenticated, to pull down { uid, ... } and store a
 // local "linked account" record. See /linkCodes below for the exact contract.
+//
+// Friends (1.0 design note): a long, random, permanent, PRIVATE identifier
+// (distinct from username/displayName) that you hand a friend out-of-band to
+// send a friend request — the point is adding friends without a public,
+// guessable/spammable handle.
+//   /privateIds/{privateId} — reservation/lookup doc: { uid }. Doc id IS the
+//                             private ID itself — long enough (20+ chars,
+//                             mixed-case + digits) that it's unguessable, so a
+//                             direct `get` by a friend who was handed the exact
+//                             ID is fine; `list` is explicitly disallowed so the
+//                             collection can't be enumerated. One per account,
+//                             same "doesn't already own /users/{uid}" pattern as
+//                             /usernames — created together in the signup batch.
+//   /friendLinks/{pairId}   — one doc per UNORDERED pair of accounts, doc id
+//                             `min(uidA,uidB)_max(uidA,uidB)` so there's only
+//                             ever one relationship doc per pair (no duplicate
+//                             requests possible by construction). Fields:
+//                             { a, b, status: 'pending'|'friends', requestedBy,
+//                               createdAt, respondedAt }. Mirrors /linkCodes'
+//                             already-proven pending->status transition
+//                             pattern: only the party who is NOT `requestedBy`
+//                             can flip pending -> friends (accept); either
+//                             party can delete a pending doc (cancel/decline)
+//                             or a friends doc (unfriend).
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -30,14 +54,23 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['username', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['username', 'createdAt', 'privateId'])
         && request.resource.data.username is string
         && request.resource.data.username.size() >= 3
         && request.resource.data.username.size() <= 20
         && request.resource.data.username.matches('^[a-zA-Z0-9_]+$')
-        && request.resource.data.createdAt == request.time;
-      // Username is immutable once set — no client update/delete.
-      allow update, delete: if false;
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.privateId is string
+        && request.resource.data.privateId.size() >= 16;
+      // Username and privateId are immutable once set. The one narrow
+      // exception: an account created before privateId existed can backfill
+      // it exactly once (nothing else may ever change via update).
+      allow update: if request.auth != null && request.auth.uid == uid
+        && !('privateId' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['privateId'])
+        && request.resource.data.privateId is string
+        && request.resource.data.privateId.size() >= 16;
+      allow delete: if false;
     }
 
     match /profiles/{uid} {
@@ -98,6 +131,62 @@ service cloud.firestore {
         && request.resource.data.status == 'linked';
       // The website owner can cancel their own pending code.
       allow delete: if request.auth != null && request.auth.uid == resource.data.uid;
+    }
+
+    // Private-ID reservation/lookup. Doc id IS the private ID string itself —
+    // `get` (fetch by exact id, which requires already knowing it) is open,
+    // but `list` is explicitly closed so the collection can't be enumerated;
+    // the ID's own length/randomness is what keeps it unguessable.
+    match /privateIds/{privateId} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        // One private ID per account. Two valid cases: fresh signup, where
+        // /users/{uid} doesn't exist yet (created together in the same
+        // batch) — or backfilling an older account that already exists but
+        // has no privateId field yet (about to be filled in the same batch
+        // as this create, see /users/{uid}'s backfill update rule above).
+        && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            || !('privateId' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data));
+      allow update, delete: if false;
+    }
+
+    // Friendships. One doc per UNORDERED pair of accounts — doc id is
+    // `min(a,b)_max(a,b)` so a duplicate request can't exist by construction.
+    match /friendLinks/{pairId} {
+      // `resource != null` must come first — the client checks "does a
+      // relationship already exist?" by reading a pairId that often doesn't
+      // exist yet, and referencing resource.data on a nonexistent doc is a
+      // rules evaluation error (reads as permission-denied), not just "false".
+      allow read: if request.auth != null && resource != null
+        && (request.auth.uid == resource.data.a || request.auth.uid == resource.data.b);
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['a', 'b', 'status', 'requestedBy', 'createdAt'])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.a != request.resource.data.b
+        && (request.auth.uid == request.resource.data.a || request.auth.uid == request.resource.data.b)
+        && pairId == (request.resource.data.a < request.resource.data.b
+              ? request.resource.data.a + '_' + request.resource.data.b
+              : request.resource.data.b + '_' + request.resource.data.a);
+      // Accepting: only the party who did NOT send the request can flip
+      // pending -> friends (mirrors /linkCodes' pending -> linked pattern) —
+      // a requester accepting their own request would make it pointless.
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.a || request.auth.uid == resource.data.b)
+        && resource.data.status == 'pending'
+        && request.auth.uid != resource.data.requestedBy
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt'])
+        && request.resource.data.status == 'friends'
+        && request.resource.data.respondedAt == request.time;
+      // Either party can delete a pending doc (cancel/decline) or a friends
+      // doc (unfriend) — deleting just clears the relationship entirely,
+      // leaving room to send a fresh request later.
+      allow delete: if request.auth != null
+        && (request.auth.uid == resource.data.a || request.auth.uid == resource.data.b);
     }
 
     // Everything else: closed by default.
