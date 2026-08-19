@@ -5,7 +5,7 @@
 > known issues, and the full 4-stage plan to online.
 > Companion: `Blockwire-Design-Doc.md` holds the deeper design rationale (§ refs below).
 
-**Current version:** v0.8.33 (`blockwire-online/`) / v0.8.27 (`public/blockwire.html`) ·
+**Current version:** v0.8.34 (`blockwire-online/`) / v0.8.27 (`public/blockwire.html`) ·
 **Milestone:** bwplayer (0.8) complete; pre-online cleanup done; Stage 1 Milestones 1–4
 (fork + desktop shell; accounts + device linking; multi-world saves + menu redesign;
 LAN multiplayer) all built; the Milestone 3 main menu was then **rebuilt from scratch**
@@ -896,22 +896,71 @@ noted below).
     exist. What's built is the honest version: a standard, secure,
     enumeration-safe reset-by-email flow. Not overclaiming stronger
     verification than actually exists.
-  - "Resetting a password signs out every other linked device" is true for
-    live Firebase Auth sessions (the website) by Firebase's own default
-    behavior — but the **desktop app has no Firebase Auth session at all**
-    (per Milestone 2's device-linking design, it only caches a static
-    `{uid, displayName}` locally after a one-time pairing code exchange), so
-    a password reset does *not* propagate to unlink an already-linked
-    desktop app. Fixing that for real needs the app to gain a live Firebase
-    Auth session — genuinely separate, bigger work, not attempted here.
-  - **Friends menu inside `blockwire-online` itself is still "Coming soon."**
-    The app has no live Firebase Auth session, so it cannot read/write
-    Firestore as the linked user at all today — building Friends *in the
-    app* isn't "add a menu," it's "give the app a real Firebase session
-    first" (e.g. the webview running the full Firebase Auth JS SDK directly,
-    same as the website, rather than only the one-off pairing-code exchange
-    device-linking currently does). Flagging this now so it isn't
-    mis-scoped as small later.
+  - ~~"Resetting a password signs out every other linked device" doesn't
+    reach the desktop app~~ — **fixed as a side effect of Milestone 6 below.**
+    This was true when written (the app only cached a static record, no live
+    session to invalidate) but no longer applies now that the app has a real
+    Firebase Auth session: Firebase's own default behavior (invalidating
+    existing ID tokens on password change) now covers every device with a
+    live session, desktop app included.
+
+**Milestone 6 — `blockwire-online` gets a real Firebase Auth session; Friends
+now works in the app too — built:** Replaces the pairing-code "device
+linking" from Milestone 2 (a short-lived code that only ever wrote a cached
+`{uid, displayName}` locally, with no live session behind it — the exact gap
+flagged right above). Chose the simpler of two options after asking Riz:
+direct email/password sign-in in the app (same credentials as the website),
+**not** upgrading the pairing-code flow to mint real sessions — that second
+path would've needed Cloud Functions, which need the Blaze billing plan
+turned on, a real cost/infra decision Riz didn't want to make for this.
+- **`loadFirebase()`** (renamed from the old `loadFirestore()`) now loads
+  `firebase-auth.js` alongside `firebase-firestore.js`, and — unlike the old
+  function, which only ever loaded lazily when "Link" was clicked — starts
+  eagerly at boot (`loadFirebase();` called unconditionally near the top of
+  the ACCOUNT section) specifically so a returning signed-in user is restored
+  automatically before they ever touch the Account panel. Firebase Auth's own
+  persistence (IndexedDB) survives app restarts with zero extra code — Tauri's
+  webview is a full browser engine, nothing Tauri-specific was needed.
+- **`getLinkedAccount()`/`setLinkedAccount()`/`clearLinkedAccount()` kept**,
+  repurposed as a synchronous local cache mirroring the real session — lets
+  `localPlayerName()` and the top-strip status read a name instantly at boot
+  without waiting on Firebase's async session restore. `onAuthStateChanged`
+  is the single source of truth that keeps this cache in sync (updates it on
+  sign-in, clears it — and stops the friend listeners — on sign-out).
+- **Account panel UI** replaced the code-entry field with a plain email/
+  password sign-in form (mirrors `public/account.html`'s), plus — once
+  signed in — the account's private ID (click-to-copy) so a player can hand
+  it to a friend without alt-tabbing to the website.
+- **Friends menu is real now** — the previously-disabled `#mFriends` button
+  is enabled and wired into the same L1/content-pane system as
+  Settings/Controls/Account (reparenting pattern from Milestone 3.1), with a
+  `friendsPanel` popup for the Pause-reached path too. The add/accept/
+  decline/cancel/remove logic and its two-onSnapshot-listeners setup are a
+  direct port of `public/account.html`'s Friends implementation — same
+  schema, same monotonic-render-token fix for the duplicate-row race, same
+  "check local state instead of re-reading a maybe-nonexistent doc" pattern
+  that sidesteps the `resource == null` rules gotcha. Ported rather than
+  reimplemented, so both known bugs from that first build didn't need
+  rediscovering here.
+- **Verified live, cross-platform, against the real project**: created two
+  throwaway accounts (one via the website, one via the website in a second
+  tab), signed into the *desktop app build* (served locally, real Firebase
+  project) as account A, sent a friend request to B's private ID from the
+  app, switched to the website as B and confirmed the request arrived,
+  accepted it there — and watched the app's own `onSnapshot` listener pick
+  up the acceptance **live, with no reload**, moving B straight into the
+  app's friends list in real time. Also confirmed: session persists across a
+  full page reload (simulating an app restart) via Firebase's own
+  persistence; sign-out cleanly clears the cached account, stops the friend
+  listeners, and flips the UI back to signed-out. Harness clean
+  (`SYNTAX OK`/`RUNTIME OK`); `cargo check` clean (no Rust touched — this is
+  entirely a JS/Firebase-SDK change). Cleaned up the throwaway
+  `usernames`/`privateIds` docs afterward, same precedent as before.
+- **What this unblocks**: any future Firestore-backed feature in the app
+  (not just Friends) now has a real path — the app can read/write as the
+  signed-in user like the website always could. World hosting/visibility
+  (Whitelist/Public, see below) is next in line to benefit from this once
+  its own infra questions are answered.
 
 **Design notes still not built (recorded so they're not lost):**
 - **1.0/Stage 3 — world hosting model:** a saved world gets a visibility setting,

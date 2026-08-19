@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Blockwire 0.8.33 Playtest</title>
+<title>Blockwire 0.8.34 Playtest</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='0' y='0' width='16' height='16' fill='%23FF0000'/><rect x='16' y='0' width='16' height='16' fill='%2300FF00'/><rect x='0' y='16' width='16' height='16' fill='%230080FF'/><rect x='16' y='16' width='16' height='16' fill='%23FFFF00'/><g fill='%230F1216' font-family='sans-serif' font-weight='900' font-size='44'><text x='-1.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>B</text><text x='14.5' y='31' textLength='19' lengthAdjust='spacingAndGlyphs'>W</text></g></svg>" />
 <link href="vendor/fonts/fonts.css" rel="stylesheet">
 <script src="vendor/three.min.js"></script>
@@ -470,7 +470,24 @@
   .recEmpty { color: #9aa3b0; font-size: 12px; }
   .painterHint { font-size: 11px; color: #9aa3b0; }
   .miniLabel { font-size: 11px; color: #9aa3b0; }
+  .miniInput {
+    width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 8px;
+    border-radius: 6px; border: 1px solid #555d6b; background: #1f242c; color: #fff;
+    font-size: 14px; font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  }
   .previewRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .friendRow {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid #2E3846; font-size: 13px; color: #E6EAF0;
+  }
+  .friendRow:last-child { border-bottom: 0; }
+  .friendRow .fname { flex: 1; }
+  .friendRow .mbtn { width: auto; padding: 5px 12px; font-size: 11.5px; }
+  .friendGroupLabel {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #6b7686;
+    letter-spacing: .06em; text-transform: uppercase; margin: 12px 0 4px;
+  }
+  .friendGroupLabel:first-child { margin-top: 0; }
   .previewSel { padding: 4px 6px; border-radius: 5px; border: 1px solid #555d6b; background: #1f242c; color: #fff; font-size: 12px; }
   .brushBtn { width: 26px; padding: 5px 0; border-radius: 6px; border: 1px solid #555d6b; background: #333b47; color: #cdd3dc; cursor: pointer; font-size: 12px; }
   .brushBtn.sel { background: #3a4d7a; border-color: #4a63a0; color: #fff; }
@@ -728,7 +745,7 @@
     </div>
   </div>
 </div>
-<div id="versionBadge">v0.8.33</div>
+<div id="versionBadge">v0.8.34</div>
 
 <!-- ===== App shell: main menu / settings / pause ===== -->
 <div id="menuRoot" class="scrim open">
@@ -769,7 +786,7 @@
         <button id="mSettings" class="mbtn">Settings</button>
         <button id="mControls" class="mbtn">Controls</button>
         <button id="mAccount" class="mbtn">Account</button>
-        <button id="mFriends" class="mbtn mbtn-disabled" disabled>Friends <span class="mSoon">Coming soon</span></button>
+        <button id="mFriends" class="mbtn">Friends</button>
       </div>
 
       <!-- Middle: level-2 nav (only Play has one today) -->
@@ -818,7 +835,7 @@
     <div class="menuBottomStrip">
       <span>Blockwire is free software under the AGPLv3.</span>
       <span>By playing you agree to the <button type="button" class="linklike" id="menuTosLink">Terms of Service</button>.</span>
-      <span class="mfoot" id="mSaveNote" style="margin:0;">Playtest 0.8.33</span>
+      <span class="mfoot" id="mSaveNote" style="margin:0;">Playtest 0.8.34</span>
     </div>
 
     <input id="worldFile" type="file" accept=".json,.blockwire" hidden />
@@ -934,25 +951,49 @@
     </div>
   </div>
 
-  <!-- Account / device linking (small popup, reached from Pause only) -->
+  <!-- Account (small popup, reached from Pause only) -->
   <div class="mpanel mpanel-wide" id="accountPanel" hidden>
     <div class="mhead"><h2>Account</h2><button class="mx" id="acctBack">Back</button></div>
     <div id="acctBodyHost">
       <div id="acctBody">
-        <div id="acctUnlinked">
-          <p class="miniLabel">Link this device to your Blockwire account: sign in at
-            <b>blockwire.web.app/account.html</b>, click "Link a device", and enter the
-            code it gives you below.</p>
-          <div class="previewRow">
-            <input type="text" id="acctCodeInput" maxlength="6" placeholder="CODE"
-              style="text-transform:uppercase; letter-spacing:0.12em; font-family:'IBM Plex Mono',monospace; width:110px;" />
-            <button id="acctLinkBtn" class="mbtn mbtn-go" style="width:auto; padding:0 18px;">Link</button>
-          </div>
+        <div id="acctSignedOut">
+          <p class="miniLabel">Sign in with the account you created at
+            <b>blockwire.web.app/account.html</b>.</p>
+          <input type="email" id="acctEmail" class="miniInput" placeholder="Email" autocomplete="email" />
+          <input type="password" id="acctPassword" class="miniInput" placeholder="Password" autocomplete="current-password" />
+          <button id="acctSignInBtn" class="mbtn mbtn-go" style="width:100%;">Sign in</button>
           <p class="miniLabel" id="acctMsg" style="display:none; margin-top:8px;"></p>
         </div>
-        <div id="acctLinked" hidden>
-          <p class="miniLabel">Linked as <b id="acctDisplayName"></b>.</p>
-          <button id="acctUnlinkBtn" class="mbtn mbtn-quiet">Unlink this device</button>
+        <div id="acctSignedIn" hidden>
+          <p class="miniLabel">Signed in as <b id="acctDisplayName"></b>.</p>
+          <div class="previewRow" style="margin:10px 0;">
+            <span class="miniLabel">Your private ID:</span>
+            <span id="acctPrivateId" class="miniLabel" style="color:#fff; font-family:'IBM Plex Mono',monospace; cursor:pointer;" title="Click to copy"></span>
+          </div>
+          <p class="miniLabel" id="acctCopyNote" style="min-height:1.2em; margin:0 0 10px;"></p>
+          <button id="acctSignOutBtn" class="mbtn mbtn-quiet">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Friends (small popup, reached from Pause only) -->
+  <div class="mpanel mpanel-wide" id="friendsPanel" hidden>
+    <div class="mhead"><h2>Friends</h2><button class="mx" id="friendsBack">Back</button></div>
+    <div id="friendsBodyHost">
+      <div id="friendsBody">
+        <div id="friendsSignedOut">
+          <p class="miniLabel">Sign in (Account, in the menu) to add and see friends.</p>
+        </div>
+        <div id="friendsSignedIn" hidden>
+          <p class="miniLabel" id="friendsMsg" style="display:none; margin-bottom:8px;"></p>
+          <div class="previewRow">
+            <input type="text" id="addFriendInput" class="miniInput" placeholder="Friend's private ID" style="margin-bottom:0; flex:1;" />
+            <button id="addFriendBtn" class="mbtn mbtn-go" style="width:auto; padding:0 16px;">Add</button>
+          </div>
+          <div id="incomingRequests" style="margin-top:14px;"></div>
+          <div id="outgoingRequests"></div>
+          <div id="friendsList"></div>
         </div>
       </div>
     </div>
@@ -7062,7 +7103,7 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
   // backdrop is the actual game rather than a mock-up.
   // =====================================================================
   const menuRootEl = document.getElementById('menuRoot');
-  const PANELS = ['mainMenu', 'settingsPanel', 'controlsPanel', 'accountPanel', 'pausePanel'];
+  const PANELS = ['mainMenu', 'settingsPanel', 'controlsPanel', 'accountPanel', 'friendsPanel', 'pausePanel'];
   let panelBack = 'mainMenu'; // where Back returns to (main menu vs pause)
 
   function showPanel(id) {
@@ -7082,7 +7123,7 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
     if (id === 'mainMenu') resetMainMenuNav();
   }
   function restoreBodiesHome() {
-    const pairs = [['settingsBodyHost', 'settingsBody'], ['controlsBodyHost', 'controlsBody'], ['acctBodyHost', 'acctBody']];
+    const pairs = [['settingsBodyHost', 'settingsBody'], ['controlsBodyHost', 'controlsBody'], ['acctBodyHost', 'acctBody'], ['friendsBodyHost', 'friendsBody']];
     for (const [hostId, bodyId] of pairs) {
       const host = document.getElementById(hostId), body = document.getElementById(bodyId);
       if (body.parentElement !== host) host.appendChild(body);
@@ -7126,6 +7167,10 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
       document.getElementById('mAccount').classList.add('active');
       refreshAccountPanel();
       document.getElementById('menuContentPane').appendChild(document.getElementById('acctBody'));
+    } else if (which === 'friends') {
+      document.getElementById('mFriends').classList.add('active');
+      refreshFriendsPanel();
+      document.getElementById('menuContentPane').appendChild(document.getElementById('friendsBody'));
     }
   }
 
@@ -7468,13 +7513,20 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
   document.getElementById('ctrlBack').addEventListener('click', () => showPanel(panelBack));
 
   // =====================================================================
-  // ACCOUNT / DEVICE LINKING — the app has no Firebase Auth session of its
-  // own. Linking works via a short pairing code minted by the signed-in
-  // website (see public/account.html + firestore.rules /linkCodes): this app
-  // reads the code, flips it pending -> linked (the one write it's allowed,
-  // unauthenticated), and stores { uid, displayName } locally. That local
-  // record is the extent of "being linked" for now — enough for LAN/chat
-  // identity; a live Firebase Auth session in the app is a later concern.
+  // ACCOUNT — a real Firebase Auth session, replacing the old pairing-code
+  // "device linking" (the app used to have no Auth session of its own, just
+  // a cached { uid, displayName } written once via a short-lived code — see
+  // CLAUDE.md's Milestone 2 for that history). Signing in directly with the
+  // same email/password used on the website gives the app a live session,
+  // which is what makes Friends (and any future Firestore-backed feature)
+  // actually work here instead of staying "Coming soon" forever. Firebase
+  // Auth's own persistence (IndexedDB) survives app restarts on its own —
+  // Tauri's webview is a full browser engine, no special config needed.
+  //
+  // getLinkedAccount() etc. are kept as a synchronous local cache (mirrors
+  // the real session into localStorage) so localPlayerName() and the
+  // top-strip status can read a name instantly at boot, before Firebase's
+  // own async session restore finishes.
   // =====================================================================
   const ACCOUNT_KEY = 'blockwire.account.v1';
   function getLinkedAccount() {
@@ -7486,73 +7538,267 @@ const WIREBLOCK_RECIPE = {"name":"Wire","w":1,"h":1,"previewFace":"front","faces
   function clearLinkedAccount() {
     try { localStorage.removeItem(ACCOUNT_KEY); } catch (e) {}
   }
-  let firestoreMod = null; // lazy-loaded: linking needs network + Firestore, nothing else does
-  async function loadFirestore() {
-    if (firestoreMod) return firestoreMod;
-    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
-    const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-    const app = initializeApp({
-      projectId: 'blockwire-3d2a2',
-      apiKey: 'AIzaSyDpkfHXQu9G0YxZRjCt1ZNRQoGoe2vEopY',
-      authDomain: 'blockwire-3d2a2.firebaseapp.com',
-    });
-    firestoreMod = { db: fs.getFirestore(app), ...fs };
-    return firestoreMod;
+
+  let fb = null; // { auth, db, ...authFns, ...firestoreFns } once loaded
+  let fbReadyPromise = null;
+  function loadFirebase() {
+    if (fbReadyPromise) return fbReadyPromise;
+    fbReadyPromise = (async () => {
+      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+      const authMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js');
+      const fsMod = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+      const app = initializeApp({
+        projectId: 'blockwire-3d2a2',
+        apiKey: 'AIzaSyDpkfHXQu9G0YxZRjCt1ZNRQoGoe2vEopY',
+        authDomain: 'blockwire-3d2a2.firebaseapp.com',
+      });
+      const auth = authMod.getAuth(app);
+      const db = fsMod.getFirestore(app);
+      fb = { auth, db, ...authMod, ...fsMod };
+      authMod.onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+          clearLinkedAccount();
+          stopWatchingFriends();
+          refreshAccountPanel();
+          refreshFriendsPanel();
+          return;
+        }
+        try {
+          const [usersSnap, profileSnap] = await Promise.all([
+            fsMod.getDoc(fsMod.doc(db, 'users', user.uid)),
+            fsMod.getDoc(fsMod.doc(db, 'profiles', user.uid)),
+          ]);
+          const displayName = profileSnap.exists() ? profileSnap.data().displayName : '(no display name)';
+          const privateId = usersSnap.exists() ? usersSnap.data().privateId : null;
+          setLinkedAccount({ uid: user.uid, displayName, privateId });
+        } catch (e) { /* keep whatever was already cached */ }
+        refreshAccountPanel();
+        watchFriends(user);
+      });
+      return fb;
+    })();
+    return fbReadyPromise;
   }
+  loadFirebase(); // start immediately at boot — don't wait for the Account panel to open, so a returning signed-in user restores automatically
+
   function refreshAccountPanel() {
     const acct = getLinkedAccount();
-    document.getElementById('acctUnlinked').hidden = !!acct;
-    document.getElementById('acctLinked').hidden = !acct;
-    if (acct) document.getElementById('acctDisplayName').textContent = acct.displayName;
+    document.getElementById('acctSignedOut').hidden = !!acct;
+    document.getElementById('acctSignedIn').hidden = !acct;
+    if (acct) {
+      document.getElementById('acctDisplayName').textContent = acct.displayName;
+      document.getElementById('acctPrivateId').textContent = acct.privateId || '(unavailable)';
+    }
     const msg = document.getElementById('acctMsg');
     msg.style.display = 'none'; msg.textContent = '';
-    document.getElementById('acctCodeInput').value = '';
+    document.getElementById('acctCopyNote').textContent = '';
     refreshMenuAcctStatus();
   }
-  // Compact top-strip indicator — reflects the same getLinkedAccount() state
-  // as the Account content pane; clicking it routes there.
+  // Compact top-strip indicator — reflects the same account state as the
+  // Account content pane; clicking it routes there.
   function refreshMenuAcctStatus() {
     const acct = getLinkedAccount();
     const el = document.getElementById('menuAcctStatus');
-    el.innerHTML = acct ? 'Linked as <b>' + acct.displayName.replace(/[<>&]/g, '') + '</b>' : 'Link this device';
+    el.innerHTML = acct ? 'Signed in as <b>' + acct.displayName.replace(/[<>&]/g, '') + '</b>' : 'Sign in';
   }
   document.getElementById('menuAcctStatus').addEventListener('click', () => selectL1('account'));
   document.getElementById('menuTosLink').addEventListener('click', () => window.tosReopenReadOnly());
-  // From the main menu, Account mounts straight into the content pane —
-  // mainMenu itself stays the active panel (no showPanel() switch).
+  // From the main menu, Account/Friends mount straight into the content
+  // pane — mainMenu itself stays the active panel (no showPanel() switch).
   document.getElementById('mAccount').addEventListener('click', () => selectL1('account'));
-  // Pause-reached Account popup's own Back button (unchanged path).
+  document.getElementById('mFriends').addEventListener('click', () => selectL1('friends'));
+  // Pause-reached Account/Friends popups' own Back buttons (unchanged path).
   document.getElementById('acctBack').addEventListener('click', () => showPanel(panelBack));
-  document.getElementById('acctUnlinkBtn').addEventListener('click', () => {
-    clearLinkedAccount();
-    refreshAccountPanel();
+  document.getElementById('friendsBack').addEventListener('click', () => showPanel(panelBack));
+  document.getElementById('acctSignOutBtn').addEventListener('click', async () => {
+    try { await loadFirebase(); await fb.signOut(fb.auth); } catch (e) {}
+    // onAuthStateChanged's null-user branch handles the rest (clearing the
+    // cache, stopping friend listeners, re-rendering both panels).
   });
-  document.getElementById('acctLinkBtn').addEventListener('click', async () => {
+  document.getElementById('acctPrivateId').addEventListener('click', () => {
+    const text = document.getElementById('acctPrivateId').textContent;
+    if (!text || text.startsWith('(')) return;
+    navigator.clipboard.writeText(text).then(() => {
+      const note = document.getElementById('acctCopyNote');
+      note.textContent = 'Copied ✓';
+      setTimeout(() => { note.textContent = ''; }, 1400);
+    });
+  });
+  document.getElementById('acctSignInBtn').addEventListener('click', async () => {
     const msg = document.getElementById('acctMsg');
     const showAcctMsg = (t) => { msg.textContent = t; msg.style.display = ''; };
-    const code = document.getElementById('acctCodeInput').value.trim().toUpperCase();
-    if (!code) { showAcctMsg('Enter a code first.'); return; }
-    const btn = document.getElementById('acctLinkBtn');
+    const email = document.getElementById('acctEmail').value.trim();
+    const password = document.getElementById('acctPassword').value;
+    if (!email || !password) { showAcctMsg('Enter your email and password.'); return; }
+    const btn = document.getElementById('acctSignInBtn');
     btn.disabled = true;
-    showAcctMsg('Linking…');
+    showAcctMsg('Signing in…');
     try {
-      const { db, doc, getDoc, updateDoc } = await loadFirestore();
-      const codeRef = doc(db, 'linkCodes', code);
-      const codeSnap = await getDoc(codeRef);
-      if (!codeSnap.exists()) { showAcctMsg('That code doesn\'t exist — check for typos.'); return; }
-      const data = codeSnap.data();
-      const expiresMs = data.expiresAt && data.expiresAt.toMillis ? data.expiresAt.toMillis() : 0;
-      if (data.status !== 'pending' || Date.now() > expiresMs) { showAcctMsg('That code has expired — generate a new one.'); return; }
-      const profileSnap = await getDoc(doc(db, 'profiles', data.uid));
-      const displayName = profileSnap.exists() ? profileSnap.data().displayName : '(unknown)';
-      await updateDoc(codeRef, { status: 'linked' });
-      setLinkedAccount({ uid: data.uid, displayName, linkedAt: Date.now() });
-      refreshAccountPanel();
+      await loadFirebase();
+      await fb.signInWithEmailAndPassword(fb.auth, email, password);
+      document.getElementById('acctPassword').value = '';
+      // refreshAccountPanel() fires from onAuthStateChanged once the profile
+      // loads — no need to call it here too.
     } catch (err) {
-      showAcctMsg((err && err.message) || 'Could not link — check your connection and try again.');
+      const code = err && err.code;
+      showAcctMsg(
+        (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') ? 'Wrong email or password.'
+        : (code === 'auth/invalid-email') ? 'That email address looks wrong.'
+        : (err && err.message) || 'Could not sign in — check your connection and try again.'
+      );
     } finally {
       btn.disabled = false;
     }
+  });
+
+  // --- friends ---
+  // Mirrors public/account.html's friend system exactly (same schema, same
+  // two-fixes-found-there: reading a not-yet-existing friendLinks doc trips
+  // a real Firestore rules gotcha, and two onSnapshot listeners firing close
+  // together can race — both avoided the same way here).
+  function refreshFriendsPanel() {
+    const acct = getLinkedAccount();
+    document.getElementById('friendsSignedOut').hidden = !!acct;
+    document.getElementById('friendsSignedIn').hidden = !acct;
+    const msg = document.getElementById('friendsMsg');
+    msg.style.display = 'none'; msg.textContent = '';
+  }
+  function friendsErr(err) {
+    const msg = document.getElementById('friendsMsg');
+    msg.textContent = (err && err.message) || 'Something went wrong.';
+    msg.style.display = '';
+  }
+  const displayNameCache = new Map(); // uid -> displayName
+  async function getDisplayName(uid) {
+    if (displayNameCache.has(uid)) return displayNameCache.get(uid);
+    const snap = await fb.getDoc(fb.doc(fb.db, 'profiles', uid));
+    const name = snap.exists() ? snap.data().displayName : '(unknown player)';
+    displayNameCache.set(uid, name);
+    return name;
+  }
+  function friendRow(name, buttons) {
+    const row = document.createElement('div'); row.className = 'friendRow';
+    const nameEl = document.createElement('span'); nameEl.className = 'fname'; nameEl.textContent = name;
+    row.appendChild(nameEl);
+    for (const [label, handler] of buttons) {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'mbtn mbtn-quiet'; btn.textContent = label;
+      btn.addEventListener('click', handler);
+      row.appendChild(btn);
+    }
+    return row;
+  }
+  let friendLinksA = [], friendLinksB = [], friendUnsubA = null, friendUnsubB = null;
+  function watchFriends(user) {
+    if (friendUnsubA) friendUnsubA();
+    if (friendUnsubB) friendUnsubB();
+    friendUnsubA = fb.onSnapshot(fb.query(fb.collection(fb.db, 'friendLinks'), fb.where('a', '==', user.uid)), (snap) => {
+      friendLinksA = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderFriends(user);
+    }, friendsErr);
+    friendUnsubB = fb.onSnapshot(fb.query(fb.collection(fb.db, 'friendLinks'), fb.where('b', '==', user.uid)), (snap) => {
+      friendLinksB = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      renderFriends(user);
+    }, friendsErr);
+  }
+  function stopWatchingFriends() {
+    if (friendUnsubA) { friendUnsubA(); friendUnsubA = null; }
+    if (friendUnsubB) { friendUnsubB(); friendUnsubB = null; }
+    friendLinksA = []; friendLinksB = [];
+  }
+  // Monotonic token — see public/account.html's identical fix for why: two
+  // listeners firing close together otherwise interleave into duplicate rows.
+  let friendsRenderToken = 0;
+  async function renderFriends(user) {
+    const myToken = ++friendsRenderToken;
+    refreshFriendsPanel();
+    const all = [...friendLinksA, ...friendLinksB];
+    const incoming = all.filter((l) => l.status === 'pending' && l.requestedBy !== user.uid);
+    const outgoing = all.filter((l) => l.status === 'pending' && l.requestedBy === user.uid);
+    const friends = all.filter((l) => l.status === 'friends');
+
+    const incomingEl = document.getElementById('incomingRequests');
+    const outgoingEl = document.getElementById('outgoingRequests');
+    const listEl = document.getElementById('friendsList');
+    if (!incomingEl) return; // panel not mounted right now
+    incomingEl.innerHTML = ''; outgoingEl.innerHTML = ''; listEl.innerHTML = '';
+
+    if (incoming.length) {
+      const label = document.createElement('div'); label.className = 'friendGroupLabel'; label.textContent = 'Requests';
+      incomingEl.appendChild(label);
+    }
+    for (const l of incoming) {
+      const otherUid = l.a === user.uid ? l.b : l.a;
+      const name = await getDisplayName(otherUid);
+      if (myToken !== friendsRenderToken) return;
+      incomingEl.appendChild(friendRow(name, [
+        ['Accept', () => fb.updateDoc(fb.doc(fb.db, 'friendLinks', l.id), { status: 'friends', respondedAt: fb.serverTimestamp() }).catch(friendsErr)],
+        ['Decline', () => fb.deleteDoc(fb.doc(fb.db, 'friendLinks', l.id)).catch(friendsErr)],
+      ]));
+    }
+
+    if (outgoing.length) {
+      const label = document.createElement('div'); label.className = 'friendGroupLabel'; label.textContent = 'Sent';
+      outgoingEl.appendChild(label);
+    }
+    for (const l of outgoing) {
+      const otherUid = l.a === user.uid ? l.b : l.a;
+      const name = await getDisplayName(otherUid);
+      if (myToken !== friendsRenderToken) return;
+      outgoingEl.appendChild(friendRow(name, [
+        ['Cancel', () => fb.deleteDoc(fb.doc(fb.db, 'friendLinks', l.id)).catch(friendsErr)],
+      ]));
+    }
+
+    if (friends.length) {
+      const label = document.createElement('div'); label.className = 'friendGroupLabel'; label.textContent = 'Friends';
+      listEl.appendChild(label);
+    }
+    for (const l of friends) {
+      const otherUid = l.a === user.uid ? l.b : l.a;
+      const name = await getDisplayName(otherUid);
+      if (myToken !== friendsRenderToken) return;
+      listEl.appendChild(friendRow(name, [
+        ['Remove', () => fb.deleteDoc(fb.doc(fb.db, 'friendLinks', l.id)).catch(friendsErr)],
+      ]));
+    }
+
+    if (!incoming.length && !outgoing.length && !friends.length) {
+      const p = document.createElement('p'); p.className = 'miniLabel'; p.style.margin = '0';
+      p.textContent = 'No friends yet — add one by their private ID above.';
+      listEl.appendChild(p);
+    }
+  }
+  document.getElementById('addFriendBtn').addEventListener('click', async () => {
+    const msgEl = document.getElementById('friendsMsg');
+    msgEl.style.display = 'none'; msgEl.textContent = '';
+    const user = fb && fb.auth.currentUser;
+    if (!user) return;
+    const id = document.getElementById('addFriendInput').value.trim();
+    if (!id) { friendsErr({ message: 'Enter a private ID first.' }); return; }
+    const btn = document.getElementById('addFriendBtn');
+    btn.disabled = true;
+    try {
+      const idSnap = await fb.getDoc(fb.doc(fb.db, 'privateIds', id));
+      if (!idSnap.exists()) { friendsErr({ message: 'No account found with that private ID.' }); btn.disabled = false; return; }
+      const otherUid = idSnap.data().uid;
+      if (otherUid === user.uid) { friendsErr({ message: "That's your own private ID." }); btn.disabled = false; return; }
+      const a = otherUid < user.uid ? otherUid : user.uid;
+      const b = otherUid < user.uid ? user.uid : otherUid;
+      const pairId = a + '_' + b;
+      const existing = [...friendLinksA, ...friendLinksB].find((l) => l.id === pairId);
+      if (existing) {
+        friendsErr({ message: existing.status === 'friends' ? "You're already friends." : 'A request is already pending.' });
+        btn.disabled = false; return;
+      }
+      await fb.setDoc(fb.doc(fb.db, 'friendLinks', pairId), { a, b, status: 'pending', requestedBy: user.uid, createdAt: fb.serverTimestamp() });
+      const msg = document.getElementById('friendsMsg');
+      msg.textContent = 'Friend request sent.'; msg.style.display = '';
+      document.getElementById('addFriendInput').value = '';
+    } catch (err) {
+      friendsErr(err);
+    }
+    btn.disabled = false;
   });
 
   // --- settings controls ---
